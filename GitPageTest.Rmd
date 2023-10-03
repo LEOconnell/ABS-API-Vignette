@@ -4,6 +4,8 @@ author: "Lisa OConnell"
 output: 
   github_document:
         toc: TRUE
+        html_preview: false
+        
 
 ---
 
