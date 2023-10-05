@@ -7,304 +7,476 @@ editor_options:
   chunk_output_type: console
 ---
 
+
+REMEMBER TO CHANGE THE OUTPUT TYPE above AND CREATE RMD files
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Description of Data
-2020 business survey
-2017 naics codes
+#Introduction  
+Data from the American Business Survey (ABS) conducted by the US CENSUS Bureau is explored in this vignette. The purpose of the vignette is to demonstrate access to multiple endpoints within the ABS data using a __X__ query parameters.  Additionally an Exploratory Data Analysis (EDA) is completed which includes both numeric and graphical summarizations.  This vignette was created and is shared using a GitHub repository and GitHub page.  
+
+
+# Description of Data  
+__Endpoints Over Time__  
+The American Business Survey data represents aggregated responses from the ABS survey conducted in the prescribed year from the selected endpoing.  Aggregations are completed at several levels of data including>>>>
+
+The ABS data accessed for this vignette represents the endpoints for the year 2021 which contains data from the 2020 survey.  Additional endpoints are available for the years 2020-2018.   
+
 
 __Endpoint Pathways:__  
 -  Company Summaries: http://api.census.gov/data/2020/abscs   
-  -  Characteristics of Business: https://api.census.gov/data/2020/abscb  
+-  Characteristics of Business: https://api.census.gov/data/2020/abscb  
 -  Characteristics of Business Owners: https://api.census.gov/data/2020/abscbo  
+  
 *Additional Endpoints Available*  
 An additional endpoint is available, but is not used in this vignette:  
 
 - Module Business Characteristics: https://api.census.gov/data/2020/absmcb  
 
-# R Libraries
+__Data Format:__
+As described in the ["CENSUS Data API User Guide"](https://www.census.gov/content/dam/Census/data/developers/api-user-guide/api-guide.pdf) The American Business Survey data returned through the API is a 2 dimensional JSON array formatted as shown below for 3 variables:  
+
+[["EMP" ,"STATE", "PAYANN"]],  
+["10000, "GA", "500000"],  
+["5000, "TX", "650000"].... 
+
+
+# Requirements: R Libraries  
 The following libraries are used to process access and process data in R.  The `tidyverse` library provides a set of packages relevant for data tidying, wrangling, and summarization.  The `httr` package provides functions to work with urls.  The `jsonlite`package provides functions to work with json data.  
 
-```{r}
+```{r libraries}
 library(tidyverse)
 library(httr)
 library(jsonlite)
 ```
 
 
-#Function to Retrieve data
+#Functions to Retrieve ABS Data
 
-```{r FXgetdata}
-GetAPICallbyNC<- function(endpoint, param){
- 
-if (!(endpoint %in% (c("CS","CB", "BO")))){ 
-  stop("Check your input")}  
-#get Company Summary Data
-  if (endpoint=="CS") { 
-     endpath <- "http://api.census.gov/data/2020/abscs?"
-  
-      varlist <- "get=GEO_ID,NAME,RCPSZFI,NAICS2017_LABEL,SEX,SEX_LABEL,ETH_GROUP,ETH_GROUP_LABEL,RACE_GROUP,RACE_GROUP_LABEL,VET_GROUP,VET_GROUP_LABEL,EMPSZFI,EMPSZFI_LABEL,YEAR,FIRMPDEMP,EMP,PAYANN"
-       query <- paste0("&for=us:*&", param, "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-    }
+Several functions are created to facilitate data retrieval. These functions allow query arguements to be passed in to return specific results.  A wrapper function called `GetData` is created to contain the subfunctions needed to execute the API call (`GetAPIPath`,`GetMyRawData`), convert the data from JSON (INSERT FX), create a tidy tibble (`CreateTibble`), and reformat variables (`ChangeVars`).  
+
+The `GetAPIPath` function allows for multiple arguements to be passed in to specify query terms.  For the two endpoints used in this vignette, the following query parameters are allowed:
+
+*Characterics of Business data:*  
+Query parameters:
+
+__NAICS2017__   The NAICS industry code from the 2017 NAICS table.  Example industry sectors explored for this study are, XXXXX
+
+__VET_GROUP__ A categorical variable that returns the status of the business owner as a veteran INSERT VALUES HERE
+
+__SEX__ - A categorical variable returning the sex of the business owner.
+
+__Family Owned Businesses__ - A survey response value captured in the survey questions variables.  
+
+
+```{r FXGetAPIPath}
+#This function will pull NAIC data from either endpoint. 
+
+GetAPIPathNAICS<- function(endpoint, naics){
+   if (!(endpoint %in% (c("CB", "BO")))){ 
+       stop("Check your input")}  
+
 #Get Characteristics of Business Data
-   if (endpoint=="CS") { 
-       endpath <- "http://api.census.gov/data/2020/absco?"
-       varlist <- "?get=BUSCHAR,CBSA,EMP_PCT,EMPSZFI,ETH_GROUP,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,QDESC,RACE_GROUP,RCPPDEMP,RCPSZFI,SECTOR,SEX,STATE,SUBSECTOR,SUMLEVEL,URSZFI,VET_GROUP,YEAR,YIBSZFI"
-        query <- paste0("&for=us:*&", param, "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+   if (endpoint=="CB") { 
+       endpath <- "https://api.census.gov/data/2020/abscb?"
+       varlist <- "get=GEO_ID,NAME,NAICS2017_LABEL,BUSCHAR,BUSCHAR_LABEL,CBSA,EMP,EMPSZFI,EMPSZFI_LABEL,ETH_GROUP,ETH_GROUP_LABEL,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,QDESC,QDESC_LABEL,RACE_GROUP,RACE_GROUP_LABEL,RCPPDEMP,RCPSZFI,RCPSZFI_LABEL,SECTOR,SEX,STATE,SUBSECTOR,SUMLEVEL,URSZFI,VET_GROUP,VET_GROUP_LABEL,YEAR,YIBSZFI,YIBSZFI_LABEL"
+        #star after param gets all records beginning with param value
+        path <- paste0(endpath,varlist,
+                       "&for=us:*&",
+                       "NAICS2017=",
+                       naics, 
+                       "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
     }
-  
+
 #Get Business Owner Data  
+  #parameter = vet status - var removed from below.
+  #OWNER_VET=002 for vets
   if (endpoint=="BO") { 
-   endpath<-"https://api.census.gov/data/2020/absco"
-   varlist <- "?get=GEO_ID,NAME,NAICS2017_LABEL,OWNER_SEX,OWNER_SEX_LABEL,OWNER_ETH,OWNER_ETH_LABEL,OWNER_RACE,OWNER_RACE_LABEL,OWNER_VET,OWNER_VET_LABEL,QDESC,QDESC_LABEL,OWNCHAR,OWNCHAR_LABEL,YEAR,OWNPDEMP"
-   query <- paste0("&for=us:*&", param, "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+      endpath<-"https://api.census.gov/data/2020/abscbo?"
+      varlist <- "get=GEO_ID,NAME,NAICS2017,NAICS2017_LABEL,OWNER_SEX,OWNER_SEX_LABEL,OWNER_ETH,OWNER_ETH_LABEL,OWNER_RACE,OWNER_RACE_LABEL,OWNER_VET_LABEL,QDESC,QDESC_LABEL,OWNCHAR,OWNCHAR_LABEL,YEAR,OWNPDEMP"
+       path <- paste0(endpath,
+                      varlist,
+                      "&for=us:*&", 
+                      "NAICS2017=",
+                      naics,
+                      "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
   }
-  
-get_call<- paste0(endpath,varlist,query)    
-return(get_call)
+
+return(path)
 }
 
 ```
 
 
-```{r parsedata}
-ParseData<-function(my_rawdata) {
-#Parse JSON data from API call
-o1<-content(my_rawdata,as="parsed", encoding="UTF-8")
-o11<-fromJSON(rawToChar(my_rawdata$content))
-#o111<-as_tibble(o11)
-
-#Get variable names from the first row of data
-#var_names<-slice(o111,1)
-#num_cols<-length(var_names)
-#b<-pivot_longer(var_names, cols=1:num_cols,values_to = "new_name", names_to="old_name")
-#Replace variable names
-#my_names<-b$new_name
-#my_names
-
-#colnames(o111)<-my_names
-#Remove the column name header row
-#o1111<-o111[-1, ]
-#invisible(o1111)
-invisible(o11)
-}
-```
-
-
-```{r}
-#Working
-GetMyData<-function (endpoint, param) {
-    path<-GetAPICallbyNC(endpoint, param)
+```{r FXgetrawdata}
+#Gets the path to the endpoint for the query by NAICS
+#Pulls the raw data from the selected endpoint
+GetRawNAICS<-function (endpoint, naics) {
+    path<-GetAPIPathNAICS(endpoint, naics)
     data<-GET(path)
-    a<-status_code(CBQt)
+    #Check status of returned data
+    a<-status_code(data)
+    #Code added - if statement
+    #if (!(a==200)){
+     #   print(a)
+      #  stop("Data not Returned")
+    #  }
     print(a)
-invisible(data)
-}
-    
-b1<-content(CBQt,as="parsed", encoding="UTF-8")
-b11<-fromJSON(rawToChar(CBQt$content))
-b111<-as_tibble(q11)
-
-#Get variable names from the first row of data
-var_names<-slice(b111,1)
-num_cols<-length(var_names)
-b<-pivot_longer(var_names, cols=1:num_cols,values_to = "new_name", names_to="old_name")
-#Replace variable names
-my_names<-b$new_name
-my_names
-
-
-#dimnames(my_ChB)[[2]]<-my_names
-colnames(b111)<-my_names
-#Remove the column name header row
-b1111<-b111[-1, ]
-    
-#Check request successful via code
     invisible(data)
 }
+```
+
+
+```{r FxConvertData}
+ConvertData<-function (myraw) {
+  a1<-fromJSON(rawToChar(myraw$content))
+  a2<-as_tibble(a1)
+  invisible(a2)
+}
+
+```
+
+
+```{r FxCreateTibble}
+CreateTibble<-function(temp_df) {
+  #Create tibble 
+  temp_df<-as_tibble(temp_df)
+
+  #Get variable names from the first row of data
+  var_names<-slice(temp_df,1)
+  num_cols<-length(var_names)
+  b<-pivot_longer(var_names, cols=1:num_cols,values_to = "new_name", names_to="old_name")
+  #Replace variable names
+  my_names<-b$new_name
+  my_names
+
+  #Remove the column name header row
+  colnames(temp_df)<-my_names
+  new_data<-temp_df[-1, ]
+  #Return data
+  invisible(new_data)
+}
+```
+
+```{r WrangletoTidy}
+Wrangle<- function(my_df){
+  tidy_data <- my_df %>% 
+            ConvertData() %>% 
+            CreateTibble()
+  invisible(tidy_data)
+}
+
+```
+
+
+```{r FXChangeVars}
+#Function specific to the variables in the Characteristics of Business dataset
+#Converts all numeric variables from char to numeric
+#Converts categorical variables to factors
+
+ChangeVarsCB<-function(my_df) {
+  #Create vector of numeric variables
+  number_vars<-c("PAYANN", "FIRMPDEMP", 
+               "EMP", "RCPPDEMP")        
   
-```
-
-
-
-
-Access the Company Summaries Endpoint - Test code
-```{r}
-amtst<-GET("https://api.census.gov/data/2020/abscs?get=GEO_ID,NAME,NAICS2017,NAICS2017_LABEL,SEX,SEX_LABEL,ETH_GROUP,ETH_GROUP_LABEL,RACE_GROUP,RACE_GROUP_LABEL,VET_GROUP,VET_GROUP_LABEL,EMPSZFI,EMPSZFI_LABEL,YEAR,FIRMPDEMP,FIRMPDEMP_F,RCPPDEMP,RCPPDEMP_F,EMP,EMP_F,PAYANN,PAYANN_F,FIRMPDEMP_S,FIRMPDEMP_S_F,RCPPDEMP_S,RCPPDEMP_S_F,EMP_S,EMP_S_F,PAYANN_S,PAYANN_S_F&for=us:*&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-status_code(amtst)
-#Query Format:
-CBQ2<-GET("https://api.census.gov/data/2020/abscs?get=GEO_ID,NAME,RCPSZFI,NAICS2017_LABEL,SEX,SEX_LABEL,ETH_GROUP,ETH_GROUP_LABEL,RACE_GROUP,RACE_GROUP_LABEL,VET_GROUP,VET_GROUP_LABEL,EMPSZFI,EMPSZFI_LABEL,YEAR,FIRMPDEMP,EMP,PAYANN&for=us:*&NAICS2017=71&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-
-```
-
-These 2 blocks to function - add in path and var as fun args.
-pulls from the CS endpoint.
-Vary catigorical variables, returns all numeric variables
-```{r GetCS Data}
-
-#Request data (resource) from the endpoint
-#Include desired return variables and 
-#and data filters (for=)
-
-#GetData<- function (filepath)
-
-
-#Census Example code  
-#CBQ_old<-GET("https://api.census.gov/data/2020/abscs?get=GEO_ID,NAME,RCPSZFI,NAICS2017_LABEL,SEX,SEX_LABEL,ETH_GROUP,ETH_GROUP_LABEL,RACE_GROUP,RACE_GROUP_LABEL,VET_GROUP,VET_GROUP_LABEL,EMPSZFI,EMPSZFI_LABEL,YEAR,FIRMPDEMP,FIRMPDEMP_F,RCPPDEMP,RCPPDEMP_F,EMP,EMP_F,PAYANN,PAYANN_F,FIRMPDEMP_S,FIRMPDEMP_S_F,RCPPDEMP_S,RCPPDEMP_S_F,EMP_S,EMP_S_F,PAYANN_S,PAYANN_S_F&for=us:*&NAICS2017=71*&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-
-CSQ<-GET("https://api.census.gov/data/2020/abscs?get=EMP,EMPSZFI,ETH_GROUP,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,RCPPDEMP,RCPSZFI,RACE_GROUP,SECTOR,SEX,STATE,URSZFI,VET_GROUP,YEAR&for=us:*&NAICS2017=71*&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-#Check request successful via code
-status_code(CSQ)
-#Get data to parse, 
-q1<-content(CSQ,as="parsed", encoding="UTF-8")
-q11<-fromJSON(rawToChar(CSQ$content))
-q111<-as_tibble(q11)
-
-#Get variable names from the first row of data
-var_names<-slice(q111,1)
-num_cols<-length(var_names)
-b<-pivot_longer(var_names, cols=1:num_cols,values_to = "new_name", names_to="old_name")
-#Replace variable names
-my_names<-b$new_name
-my_names
-
-
-#dimnames(my_ChB)[[2]]<-my_names
-colnames(q111)<-my_names
-#Remove the column name header row
-q1111<-q111[-1, ]
-
-
-
-```
-
-
-
-
-
-Access the Characteristics of Business Endpoint 
-
-```{r}
-#char_biz_path<-c("https://api.census.gov/data/2020/abscb")
-
-#char_biz_test<-GET("https://api.census.gov/data/2020/abscb?get=GEO_ID,NAME,NAICS2017,NAICS2017_LABEL,SEX,SEX_LABEL,ETH_GROUP,ETH_GROUP_LABEL,RACE_GROUP,RACE_GROUP_LABEL,VET_GROUP,VET_GROUP_LABEL,QDESC,QDESC_LABEL,BUSCHAR,BUSCHAR_LABEL,YEAR,FIRMPDEMP,FIRMPDEMP_F,FIRMPDEMP_PCT,FIRMPDEMP_PCT_F,RCPPDEMP,RCPPDEMP_F,RCPPDEMP_PCT,RCPPDEMP_PCT_F,EMP,EMP_F,EMP_PCT,EMP_PCT_F,PAYANN,PAYANN_F,PAYANN_PCT,PAYANN_PCT_F,FIRMPDEMP_S,FIRMPDEMP_S_F,FIRMPDEMP_PCT_S,FIRMPDEMP_PCT_S_F,RCPPDEMP_S,RCPPDEMP_S_F,RCPPDEMP_PCT_S,RCPPDEMP_PCT_S_F,EMP_S,EMP_S_F,EMP_PCT_S,EMP_PCT_S_F,PAYANN_S,PAYANN_S_F,PAYANN_PCT_S,PAYANN_PCT_S_F&for=us:*&QDESC_LABEL=SPOUSES&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-#status_code(char_biz_test)
-
-
-CBQt<-GET("https://api.census.gov/data/2020/abscb?get=BUSCHAR,CBSA,EMP_PCT,EMPSZFI,ETH_GROUP,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,QDESC,RACE_GROUP,RCPPDEMP,RCPSZFI,SECTOR,SEX,STATE,SUBSECTOR,SUMLEVEL,URSZFI,VET_GROUP,YEAR,YIBSZFI&for=us:*&NAICS2017=71&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-
-status_code(CBQt)
-#Get data to parse, 
-b1<-content(CBQt,as="parsed", encoding="UTF-8")
-b11<-fromJSON(rawToChar(CBQt$content))
-b111<-as_tibble(q11)
-
-#Get variable names from the first row of data
-var_names<-slice(b111,1)
-num_cols<-length(var_names)
-b<-pivot_longer(var_names, cols=1:num_cols,values_to = "new_name", names_to="old_name")
-#Replace variable names
-my_names<-b$new_name
-my_names
-
-
-#dimnames(my_ChB)[[2]]<-my_names
-colnames(b111)<-my_names
-#Remove the column name header row
-b1111<-b111[-1, ]
-
-```
-
-Access the Business Owners Endpoint
-```{r}
-#if file....for endpoint
-#filepath<-"https://api.census.gov/data/2020/abscbo?get="
-#pull_vars<-"CBSA,INDGROUP,INDLEVEL,NAICS2017,OWNCHAR,OWNER_ETH,OWNER_RACE,OWNER_SEX,OWNER_VET,OWNERDEMP,QDESC,SECTOR,STATE,SUBSECTOR,SULEVEL,YEAR"
-#getstring<-
-#WORKING CODE EXAMPLE
-#CBO1<-GET("https://api.census.gov/data/2020/abscbo?get=GEO_ID,NAME,NAICS2017,NAICS2017_LABEL,OWNER_SEX,OWNER_SEX_LABEL,OWNER_ETH,OWNER_ETH_LABEL,OWNER_RACE,OWNER_RACE_LABEL,OWNER_VET,OWNER_VET_LABEL,QDESC,QDESC_LABEL,OWNCHAR,OWNCHAR_LABEL,YEAR,OWNPDEMP,OWNPDEMP_F,OWNPDEMP_PCT,OWNPDEMP_PCT_F,OWNPDEMP_S,OWNPDEMP_S_F,OWNPDEMP_PCT_S,OWNPDEMP_PCT_S_F&for=us:*&QDESC_LABEL=YRACQBUS&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-
-
-CBOvet<-GET("https://api.census.gov/data/2020/abscbo?get=GEO_ID,NAME,NAICS2017,NAICS2017_LABEL,OWNER_SEX,OWNER_SEX_LABEL,OWNER_ETH,OWNER_ETH_LABEL,OWNER_RACE,OWNER_RACE_LABEL,OWNER_VET,OWNER_VET_LABEL,QDESC,QDESC_LABEL,OWNCHAR,OWNCHAR_LABEL,YEAR,OWNPDEMP&for=us:*&OWNER_VET=002&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-status_code(CBOvet)
-
-#Get data to parse, 
-o1<-content(CBOvet,as="parsed", encoding="UTF-8")
-o11<-fromJSON(rawToChar(CBOvet$content))
-o111<-as_tibble(o11)
-
-#Get variable names from the first row of data
-var_names<-slice(o111,1)
-num_cols<-length(var_names)
-b<-pivot_longer(var_names, cols=1:num_cols,values_to = "new_name", names_to="old_name")
-#Replace variable names
-my_names<-b$new_name
-my_names
-
-
-#dimnames(my_ChB)[[2]]<-my_names
-colnames(o111)<-my_names
-#Remove the column name header row
-o1111<-o111[-1, ]
-
-
-```
-
-
-
-
-
-Function to Change variable types  
-- There are 4 interger variables of interest in the Company Summaries endpoint:  
- *EMP*: Number of employees  
- *FIRMPDEMP*: The number of employer firms  
- *PAYANN*: The annual payroll  
- *RCPPDEMP*: Sales, shipments or revenue in ($000s)  
- 
-
-```{r FXconverttonumeric}
-
-CV<-function(my_df,endpoint) {
-#Check User Input for valid values.
-  #Converts all numeric variables from char to numeric
-  #working as of 10/4
-if (!(endpoint %in% c("CS","CB", "BO"))){ stop("Check your input")}  
-if (endpoint=="CS") { 
-   my_df$PAYANN<-as.double(my_df$PAYANN)
-   my_df$FIRMPDEMP<-as.double(my_df$FIRMPDEMP)
-   my_df$EMP<-as.double(my_df$EMP)
-   my_df$RCPPDEMP<-as.double(my_df$RCPPDEMP)
-    }
-if (endpoint=="CB") { 
-   my_df$PAYANN<-as.double(my_df$PAYANN)
-   my_df$FIRMPDEMP<-as.double(my_df$FIRMPDEMP)
-   my_df$EMP<-as.double(my_df$EMP)
-   my_df$RCPPDEMP<-as.double(my_df$RCPPDEMP)
-    }
-  if (endpoint=="BO") { 
-   my_df$OWNPDEMP<-as.double(my_df$OWNPDEMP)
-       } 
-  
-   return(invisible(my_df))
+  #Create vector of factor variables 
+  factor_vars<-c("EMPSZFI", "ETH_GROUP", "RCPSZFI",
+               "URSZFI", "SEX", "VET_GROUP", "ETH_GROUP")
+  #Apply changes to my_df
+  my_df<-my_df %>% 
+      mutate(across(factor_vars,as.factor)) %>% 
+      mutate(across(number_vars, as.double))
+return(my_df)
 }  
+```
+
+```{r FXChangeVars}
+#Function specific to the variables in the Business Owners dataset
+#Converts all numeric variables from char to numeric
+#Converts categorical variables to factors
+
+ChangeVarsBO<-function(my_df) {
+  #Change the only numeric variable in the dataset
+  my_df$OWNPDEMP<-as.double(my_df$OWNPDEMP)
+
+    #Create vector of factor variables 
+  factor_vars<-c("OWNER_SEX", "OWNER_VET", 
+               "OWNER_ETH","OWNER_RACE")
   
+  #Apply factor changes to my_df
+  my_df<-my_df %>% 
+      mutate(across(factor_vars,as.factor))  
+return(my_df)
+}  
 ```
 
 
-Selectable Variables for Fuction:
-For both:
-NAICS2017 code
+```{r DataWrapperNAICS}
+#A wrapper function to get the data for NAICS from either endpoint
+GetNAICS<-function(endpoint,naics){
+    a1<-GetRawNAICS(endpoint, naics)
+    #a2<-ConvertData(a1)
+    #a3<-CreateTibble(a2)
+    a2<-Wrangle(a1)
+        if (endpoint=="CB"){
+            a3<-ChangeVarsCB(a2)
+             }
+        if(endpoint=="BO"){
+           a3<-ChangeVarsBO(a2)
+            }
+ return(a3)    
+}    
+```
 
-For CS
 
-For BO
-Vet owned: 
-001: all
-002 Veteran
-004 non veterain
+__Family Owned Businesses Functions__
+To query only family owned business or non-family owned business, the following function is created.  This passes the desired type of firm into the function, and sets a default value for the industry of interest to the focus industry, transportation (NAICS code = 484).  Family owned business are denoted by codes in survey questions(QDESC=B02) and responses to the B02 question = "BM" for Family Owned, "BN" for non family owned business.   
 
+```{r FxFamBizAPI}
+#A Path generator function for family business queries
+GetAPIPathFamBiz<- function(famcode){
+ 
+if (!(famcode %in% (c("BM","BN")))){ 
+ stop("Check your input")}  
+
+#else{
+  endpath <- "https://api.census.gov/data/2020/abscb?"
+  varlist <- "get=GEO_ID,NAME,NAICS2017,NAICS2017_LABEL,BUSCHAR_LABEL,CBSA,EMP,EMPSZFI,EMPSZFI_LABEL,ETH_GROUP,ETH_GROUP_LABEL,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,QDESC_LABEL,RACE_GROUP,RACE_GROUP_LABEL,RCPPDEMP,RCPSZFI,RCPSZFI_LABEL,SECTOR,SEX,STATE,SUBSECTOR,SUMLEVEL,URSZFI,VET_GROUP,VET_GROUP_LABEL,YEAR,YIBSZFI,YIBSZFI_LABEL"
+  #star after param gets all records beginnning with param value
+   path <- paste0(endpath,varlist,
+                       "&for=us:*&QDESC=B02",
+                       "&BUSCHAR=",
+                        famcode,
+                       "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+#    }
+
+return(path)
+}
+
+```
+
+
+```{r FxFamBizRawData}
+
+#Gets the path to the endpoint for the query by NAICS
+#Pulls the raw data
+GetRawFamBiz<-function (famcode) {
+    path<-GetAPIPathFamBiz(famcode)
+    data<-GET(path)
+    #Check status of returned data
+    a<-status_code(data)
+    #Code added - if statement
+    #if (!(a==200)){
+     #   print(a)
+      #  stop("Data not Returned")
+    #  }
+    print(a)
+    invisible(data)
+}
+```
+
+
+```{r datawrapperFamBiz}
+#Wrapper Function to get data from API,and wrangle into a tidy tibble.
+#This call is only applicable to the  Characteristics of Businesses Endpoint
+GetFamBiz<-function(famcode){
+    a1<-GetRawFamBiz(famcode)
+    a2<-ConvertData(a1)
+    a3<-CreateTibble(a2)
+    a4<-ChangeVarsCB(a3)
+#Return a dataset
+ return(a4)   
+}
+```
+
+
+__Vet by NAICS Data Functions__  
+This function allows you to query for industry code and vet status. This is an example of modifying 2 variables on the endpoint. The default value for this function is set to the industry of interest, Transportation at NAICS code beginning with "484".  The default value for the vetcode arguement is "002" which pulls records for business owned by veterans.
+
+
+```{r GetVetsRawCB}
+GetVetsRawCB<-function(vetcode="002", naics="=484"){
+#Create URL path
+endpath <- "https://api.census.gov/data/2020/abscb?"
+varlist <- "get=GEO_ID,NAME,NAICS2017_LABEL,BUSCHAR_LABEL,CBSA,EMP,EMPSZFI,EMPSZFI_LABEL,ETH_GROUP,ETH_GROUP_LABEL,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,QDESC_LABEL,RACE_GROUP,RACE_GROUP_LABEL,RCPPDEMP,RCPSZFI,RCPSZFI_LABEL,SECTOR,SEX,STATE,SUBSECTOR,SUMLEVEL,URSZFI,VET_GROUP_LABEL,YEAR,YIBSZFI,YIBSZFI_LABEL"
+#star after param gets all records beginnning with param value
+path <- paste0(endpath,varlist,
+                      "&for=us:*&", 
+                      "&VET_GROUP=" ,
+                       vetcode,
+                      "&NAICS2017=",
+                      naics,
+                       "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+data<-GET(path)
+#Check status of returned data
+a<-status_code(data)
+#Code added - if statement
+    #if (!(a==200)){
+     #   print(a)
+      #  stop("Data not Returned")
+    #  }
+print(a)
+invisible(data)
+}
+```
+
+
+
+```{r datawrapperFamilyOwned}
+#Calls the path generator function, then wrangles data.
+#This call is only applicable to the  Characteristics of Businesses Endpoint
+GetVetsCB<-function(vetcode,naics){
+    a1<-GetVetsRawCB(vetcode,naics)
+    a2<-Wrangle(a1)
+    a3<-ChangeVarsCB(a2)
+ return(a3)    
+ }
+```
+
+
+BY SEX:
+
+```{r}
+#A Path generator function for family business queries
+GetAPIPathSx<- function(codevalue){
+ 
+  endpath <- "https://api.census.gov/data/2020/abscb?"
+  varlist <- "get=GEO_ID,NAME,NAICS2017,NAICS2017_LABEL,BUSCHAR_LABEL,CBSA,EMP,EMPSZFI,EMPSZFI_LABEL,ETH_GROUP,ETH_GROUP_LABEL,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,QDESC_LABEL,RACE_GROUP,RACE_GROUP_LABEL,RCPPDEMP,RCPSZFI,RCPSZFI_LABEL,SECTOR,STATE,SUBSECTOR,SUMLEVEL,URSZFI,VET_GROUP,VET_GROUP_LABEL,YEAR,YIBSZFI,YIBSZFI_LABEL"
+    #star after param gets all records beginnning with param value
+ 
+  #Set the full URL path:
+    path <- paste0(endpath,varlist,
+                       "&for=us:*&", 
+                       "SEX=",
+                       codevalue,
+                       "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+return(path)
+}
+
+```
+
+
+```{r FXGetRawCBbySex}
+
+GetRawBySx<-function (codein) {
+    path<-GetAPIPathSx(codein)
+    data<-GET(path)
+    #Check status of returned data
+    a<-status_code(data)
+    #Code added - if statement
+    #if (!(a==200)){
+     #   print(a)
+      #  stop("Data not Returned")
+    #  }
+    print(a)
+    invisible(data)
+}
+```
+
+```{r datawrapperFamilyOwned}
+#Calls the path generator function, then wrangles data.
+#This call is only applicable to the  Characteristics of Businesses Endpoint
+GetCBbySx<-function(codein){
+    a1<-GetRawBySx(codein)
+    a2<-Wrangle(a1)
+    a3<-ChangeVarsCB(a2)
+ return(a3)   
+}
+```
+
+
+
+
+Modifications to the first endpoint - Characteristics of Businesses Surveyed  
+- Select the industry Code to investigated  
+- Sales receipts over a certain level  
+
+ 
+# Data Exploration  
+
+## Data Slices from the  __Characteristics of Business__ (CB)endpoint  
+
+For this vignette, I am interested in exploring data representing the truck transportation industry.  I am interested in undertanding a general overview, and a focus on veteran owned businesses in particular.   
+
+This industry is represented by North American Indsutry Classification System ([NAICS](https://www.census.gov/naics/?99967)) codes beginning with 484 - Truck Transportation. Records are stored at a lower level of classification as well as the aggregate level - 484.  
+
+To create an overview of the truck transportation industry, data is extracted from the CB endpoint.  
+
+Below verified 10/5
+```{r}
+#Use wrapper function to pull data from the CB endpoint with NAICS_2017 query.  
+#The "*" following 484 is a wildcard that will pull all records that start with 484.  
+TRUCKS<-GetNAICS ("CB","484*")
+```
+
+INSERT SUMMARIES 
+
+To get an overview of business owners in general and veteran business owners in particular, I have queried the Characteristics of Business Owners endpoint for the transportation industry.  This query is refined further to 
+
+```{r}
+FamBiz<-GetFamBiz(famcode = "BM")
+```
+
+INSERT SUMMARIES
+
+Veteran Owned Business
+Working
+
+```{r}
+Vets<-GetVetsCB(vetcode = "002", naics = "484")
+VetsTransDetail<-GetVetsCB(vetcode = "002", naics = "48*")
+#Demonstrating the use of the wildcard to pull lower level aggregate records
+AllVetsinUtil<-GetVetsCB(vetcode = "002", naics = "221*")
+AllVets<-GetVetsCB(vetcode = "002", naics = "*")
+
+  
+```
+
+INSERT SUMMARIES
+
+By Sex
+
+```{r}
+#Pull all records for all females
+Females<-GetCBbySx(codein = "002")
+```
+
+Insert Summaries
+
+__Data Slices From Characteristics of Business Owners Endpoint__  
+
+
+To take a closer look at the profile of veteran owned businesses, we can extract survey results from the Business Owners endpoint, focusing on veterans.
+
+
+We can use our `GetVetsBo` function to pull dataset of owner information by veteran owned status.  The default value for veteran status is set to pull veterans, with a code = "002".  This function allows you to pull by NAICS code as well, but uses a wildcard value as the default.
+```{r}
+GetRawVetsBO<- function (vetcode="002"){
+  #Create url 
+  endpath<-"https://api.census.gov/data/2020/abscbo?"
+  varlist <- "get=GEO_ID,NAME,NAICS2017,NAICS2017_LABEL,OWNER_SEX,OWNER_SEX_LABEL,OWNER_ETH,OWNER_ETH_LABEL,OWNER_RACE,OWNER_RACE_LABEL,OWNER_VET_LABEL,QDESC,QDESC_LABEL,OWNCHAR,OWNCHAR_LABEL,YEAR,OWNPDEMP"
+       path <- paste0(endpath,
+                      varlist,
+                      "&for=us:*&", 
+                      "&OWNER_VET=",
+                      vetcode,
+                      "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+       
+my_data<-GET(path)
+return(my_data)
+  }
+
+```
+
+```{r}
+VetBO<-function(vetcode="002"){
+  a<-GetRawVetsBO(vetcode)
+  b<-Wrangle(a)
+  c<-ChangeVarsBO(b)
+}
+```
 
 
 

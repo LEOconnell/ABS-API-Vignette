@@ -65,6 +65,8 @@ __VET_GROUP__ A categorical variable that returns the status of the business own
 
 __SEX__ - A categorical variable returning the sex of the business owner.
 
+__Family Owned Businesses__ - A survey response value captured in the survey questions variables.  
+
 
 ```{r FXGetAPIPath}
 
@@ -368,7 +370,7 @@ invisible(data)
 ```{r datawrapperFamilyOwned}
 #Calls the path generator function, then wrangles data.
 #This call is only applicable to the  Characteristics of Businesses Endpoint
-GetVets<-function(vetcode,naics){
+GetVetsCB<-function(vetcode,naics){
     a1<-GetVetsRawCB(vetcode,naics)
     a2<-ConvertData(a1)
     a3<-CreateTibble(a2)
@@ -561,21 +563,26 @@ To create an overview of the truck transportation industry, data is extracted fr
 TRUCKS<-GetNAICS("CB","NAICS_2017=484*")
 ```
 
-__Data Slices From Characteristics of Business Owners Endpoint__
+INSERT SUMMARIES 
+
 To get an overview of business owners in general and veteran business owners in particular, I have queried the Characteristics of Business Owners endpoint for the transportation industry.  This query is refined further to 
 
 ```{r}
 FamBiz<-GetFamBiz(famcode = "BM")
 ```
 
+INSERT SUMMARIES
+
 Veteran Owned Business
 
 ```{r}
-Vets<-GetVets(vetcode = "002")
+Vets<-GetVetsCB(vetcode = "002")
 
   
   
 ```
+
+INSERT SUMMARIES
 
 By Sex
 
@@ -583,6 +590,16 @@ By Sex
 Females<-GetbySx(codein = "002")
 ```
 
+Insert Summaries
+
+__Data Slices From Characteristics of Business Owners Endpoint__  
+
+
+To take a closer look at the profile of veteran owned businesses, we can extract survey results from the Business Owners endpoint, focusing on veterans.
+
+```{r}
+
+```
 
 
 
