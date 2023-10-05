@@ -1,0 +1,289 @@
+---
+title: "temp"
+author: "Lisa OConnell"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Description of Data
+2020 business survey
+2017 naics codes
+
+__Endpoint Pathways:__  
+-  Company Summaries: http://api.census.gov/data/2020/abscs   
+  -  Characteristics of Business: https://api.census.gov/data/2020/abscb  
+-  Characteristics of Business Owners: https://api.census.gov/data/2020/abscbo  
+*Additional Endpoints Available*  
+An additional endpoint is available, but is not used in this vignette:  
+
+- Module Business Characteristics: https://api.census.gov/data/2020/absmcb  
+
+# R Libraries
+The following libraries are used to process access and process data in R.  The `tidyverse` library provides a set of packages relevant for data tidying, wrangling, and summarization.  The `httr` package provides functions to work with urls.  The `jsonlite`package provides functions to work with json data.  
+
+```{r}
+library(tidyverse)
+library(httr)
+library(jsonlite)
+```
+
+
+#Function to Retrieve data
+
+```{r FXgetdatapath}
+
+#DELANEY - 2 THIS CREATES THE STRING TO PASS TO GET()
+#DELANEY: PARAMETERS FOR TESTING: mypath<-GetAPICallbyNC("CS", "NAICS2017=71")
+#THE non function vession of this code works, but this produces an error:
+#As tested by: 
+#  > GET(mypath)
+#  Error in curl::curl_fetch_memory(url, handle = handle) : 
+#  Failure when receiving data from the peer
+
+
+GetAPICallbyNC<- function(endpoint, param){
+ 
+if (!(endpoint %in% (c("CS","CB", "BO")))){ 
+  stop("Check your input")}  
+#get Company Summary Data
+  if (endpoint=="CS") { 
+     endpath <- "https://api.census.gov/data/2020/abscs?"
+  
+      varlist <- "get=EMP,EMPSZFI,ETH_GROUP,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,RCPPDEMP,RCPSZFI,RACE_GROUP,SECTOR,SEX,STATE,URSZFI,VET_GROUP,YEAR"
+       query <- paste0("&for=us:*&", param, "*&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+  }
+  
+#Get Characteristics of Business Data
+   if (endpoint=="CB") { 
+       endpath <- "https://api.census.gov/data/2020/abscb?"
+       varlist <- "?get=BUSCHAR,CBSA,EMP_PCT,EMPSZFI,ETH_GROUP,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,QDESC,RACE_GROUP,RCPPDEMP,RCPSZFI,SECTOR,SEX,STATE,SUBSECTOR,SUMLEVEL,URSZFI,VET_GROUP,YEAR,YIBSZFI"
+        query <- paste0("&for=us:*&", param, "*&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+    }
+  
+  
+#Get Business Owner Data  
+  if (endpoint=="BO") { 
+   endpath<-"https://api.census.gov/data/2020/absco"
+   varlist <- "?get=GEO_ID,NAME,NAICS2017_LABEL,OWNER_SEX,OWNER_SEX_LABEL,OWNER_ETH,OWNER_ETH_LABEL,OWNER_RACE,OWNER_RACE_LABEL,OWNER_VET,OWNER_VET_LABEL,QDESC,QDESC_LABEL,OWNCHAR,OWNCHAR_LABEL,YEAR,OWNPDEMP"
+   query <- paste0("&for=us:*&", param, "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+  }
+  
+get_path<- paste0(endpath,varlist,query)    
+return(get_path)
+}
+
+```
+
+DELANEY: PARAMETERS FOR TESTING: mypath<-GetAPICallbyNC("CS", "NAICS2017=71")
+
+```{r FXgetrawdata}
+#Working
+GetMyData<-function (endpoint, param) {
+    path<-GetAPICallbyNC(endpoint, param)
+    #DELANEY - 3 THIS FAILS AND I THINK IT MAY BE BECAUSE OF HOW I AM PASSING STRING ...do the "" fall off?
+    data<-GET(path)
+    
+    a<-status_code(CBQt)
+    print(a)
+    invisible(data)
+    #return(data)
+}
+
+```
+
+
+Wrangle Data
+
+```{r wrangleFromJSON}
+a1<-GetMyData("CS", "NAICS2017=71")
+#             a1<-content(a,as="parsed", encoding="UTF-8")
+a2<-ConvertData(a)
+a3<-CreateTibble(a2)
+
+#a11<-fromJSON(rawToChar(a$content))
+#a111<-as_tibble(a11)
+```
+
+
+```{r}
+ConvertData<-function (myraw) {
+  a11<-fromJSON(rawToChar(myraw$content))
+  a111<-as_tibble(a11)
+}
+
+```
+
+
+```{r parsedataTOTibble}
+CreateTibble<-function(a_df) {
+#Parse JSON data from API call
+#q1<-content(my_rawdata,as="text", encoding="UTF-8")
+#q11<-fromJSON(rawToChar(my_rawdata$content))
+temp_df<-as_tibble(a_df)
+
+#Get variable names from the first row of data
+var_names<-slice(temp_df,1)
+num_cols<-length(var_names)
+b<-pivot_longer(var_names, cols=1:num_cols,values_to = "new_name", names_to="old_name")
+#Replace variable names
+my_names<-b$new_name
+my_names
+
+#Remove the column name header row
+colnames(temp_df)<-my_names
+new_data<-temp_df[-1, ]
+invisible(new_data)
+
+}
+```
+
+```{r datawrapper}
+GetData<-function(endpoint,param){
+    a1<-GetMyData(endpoint, param)
+    a2<-ConvertData(a)
+    a3<-CreateTibble(a2)
+#Return a dataset
+ return(a3)    
+}    
+
+```
+
+
+```{r GetCSData}
+#DELANEY 1- THIS WORKS!
+#WORKING CODE FO CS ENDPOINTS
+#Parm with Data, NCAIS2017=71
+
+
+CS_NEW2<-GET("https://api.census.gov/data/2020/abscs?get=EMP,EMPSZFI,ETH_GROUP,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,RCPPDEMP,RCPSZFI,RACE_GROUP,SECTOR,SEX,STATE,URSZFI,VET_GROUP,YEAR&for=us:*&NAICS2017=71*&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+#Check request successful via code
+status_code(CS_NEW2)
+#Get data to parse, 
+#           q1<-content(CSQ,as="parsed", encoding="UTF-8")
+cs11<-fromJSON(rawToChar(CS_NEW2$content))
+cs111<-as_tibble(cs11)
+
+#Get variable names from the first row of data
+var_names<-slice(cs111,1)
+num_cols<-length(var_names)
+b<-pivot_longer(var_names, cols=1:num_cols,values_to = "new_name", names_to="old_name")
+
+#Replace variable names
+my_names<-b$new_name
+my_names
+colnames(cs111)<-my_names
+
+#Remove the column name header row from the data
+cs1111<-cs111[-1, ]
+
+
+
+```
+
+
+
+Access the Characteristics of Business Endpoint 
+
+```{r CBdata}
+#char_biz_path<-c("https://api.census.gov/data/2020/abscb")
+
+#char_biz_test<-GET("https://api.census.gov/data/2020/abscb?get=GEO_ID,NAME,NAICS2017,NAICS2017_LABEL,SEX,SEX_LABEL,ETH_GROUP,ETH_GROUP_LABEL,RACE_GROUP,RACE_GROUP_LABEL,VET_GROUP,VET_GROUP_LABEL,QDESC,QDESC_LABEL,BUSCHAR,BUSCHAR_LABEL,YEAR,FIRMPDEMP,FIRMPDEMP_F,FIRMPDEMP_PCT,FIRMPDEMP_PCT_F,RCPPDEMP,RCPPDEMP_F,RCPPDEMP_PCT,RCPPDEMP_PCT_F,EMP,EMP_F,EMP_PCT,EMP_PCT_F,PAYANN,PAYANN_F,PAYANN_PCT,PAYANN_PCT_F,FIRMPDEMP_S,FIRMPDEMP_S_F,FIRMPDEMP_PCT_S,FIRMPDEMP_PCT_S_F,RCPPDEMP_S,RCPPDEMP_S_F,RCPPDEMP_PCT_S,RCPPDEMP_PCT_S_F,EMP_S,EMP_S_F,EMP_PCT_S,EMP_PCT_S_F,PAYANN_S,PAYANN_S_F,PAYANN_PCT_S,PAYANN_PCT_S_F&for=us:*&QDESC_LABEL=SPOUSES&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+#status_code(char_biz_test)
+
+#WORKING CODE
+CBQt<-GET("https://api.census.gov/data/2020/abscb?get=BUSCHAR,CBSA,EMP_PCT,EMPSZFI,ETH_GROUP,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,QDESC,RACE_GROUP,RCPPDEMP,RCPSZFI,SECTOR,SEX,STATE,SUBSECTOR,SUMLEVEL,URSZFI,VET_GROUP,YEAR,YIBSZFI&for=us:*&NAICS2017=71&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+
+status_code(CBQt)
+#Get data to parse, 
+b1<-content(CBQt,as="parsed", encoding="UTF-8")
+b11<-fromJSON(rawToChar(CBQt$content))
+b111<-as_tibble(q11)
+
+#Get variable names from the first row of data
+var_names<-slice(b111,1)
+num_cols<-length(var_names)
+b<-pivot_longer(var_names, cols=1:num_cols,values_to = "new_name", names_to="old_name")
+#Replace variable names
+my_names<-b$new_name
+my_names
+
+
+#dimnames(my_ChB)[[2]]<-my_names
+colnames(b111)<-my_names
+#Remove the column name header row
+b1111<-b111[-1, ]
+
+```
+
+Access the Business Owners Endpoint
+```{r}
+
+#WORKING CODE EXAMPLE
+
+CBOvet<-GET("https://api.census.gov/data/2020/abscbo?get=GEO_ID,NAME,NAICS2017,NAICS2017_LABEL,OWNER_SEX,OWNER_SEX_LABEL,OWNER_ETH,OWNER_ETH_LABEL,OWNER_RACE,OWNER_RACE_LABEL,OWNER_VET,OWNER_VET_LABEL,QDESC,QDESC_LABEL,OWNCHAR,OWNCHAR_LABEL,YEAR,OWNPDEMP&for=us:*&OWNER_VET=002&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+status_code(CBOvet)
+
+#Get data to parse, 
+o1<-content(CBOvet,as="parsed", encoding="UTF-8")
+o11<-fromJSON(rawToChar(CBOvet$content))
+o111<-as_tibble(o11)
+
+#Get variable names from the first row of data
+var_names<-slice(o111,1)
+num_cols<-length(var_names)
+b<-pivot_longer(var_names, cols=1:num_cols,values_to = "new_name", names_to="old_name")
+#Replace variable names
+my_names<-b$new_name
+my_names
+
+colnames(o111)<-my_names
+#Remove the column name header row
+o1111<-o111[-1, ]
+
+
+```
+
+
+
+Function to Change variable types  
+- There are 4 interger variables of interest in the Company Summaries endpoint:  
+ *EMP*: Number of employees  
+ *FIRMPDEMP*: The number of employer firms  
+ *PAYANN*: The annual payroll  
+ *RCPPDEMP*: Sales, shipments or revenue in ($000s)  
+ 
+
+```{r FXconverttonumeric}
+#WORKING
+CV<-function(my_df,endpoint) {
+#Check User Input for valid values.
+  #Converts all numeric variables from char to numeric
+  #working as of 10/4
+if (!(endpoint %in% c("CS","CB", "BO"))){ stop("Check your input")}  
+if (endpoint=="CS") { 
+   my_df$PAYANN<-as.double(my_df$PAYANN)
+   my_df$FIRMPDEMP<-as.double(my_df$FIRMPDEMP)
+   my_df$EMP<-as.double(my_df$EMP)
+   my_df$RCPPDEMP<-as.double(my_df$RCPPDEMP)
+    }
+if (endpoint=="CB") { 
+   my_df$PAYANN<-as.double(my_df$PAYANN)
+   my_df$FIRMPDEMP<-as.double(my_df$FIRMPDEMP)
+   my_df$EMP<-as.double(my_df$EMP)
+   my_df$RCPPDEMP<-as.double(my_df$RCPPDEMP)
+    }
+  if (endpoint=="BO") { 
+   my_df$OWNPDEMP<-as.double(my_df$OWNPDEMP)
+       } 
+  
+   return(invisible(my_df))
+}  
+  
+```
+
