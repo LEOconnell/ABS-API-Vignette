@@ -27,7 +27,7 @@ An additional endpoint is available, but is not used in this vignette:
 # R Libraries
 The following libraries are used to process access and process data in R.  The `tidyverse` library provides a set of packages relevant for data tidying, wrangling, and summarization.  The `httr` package provides functions to work with urls.  The `jsonlite`package provides functions to work with json data.  
 
-```{r}
+```{r libraries}
 library(tidyverse)
 library(httr)
 library(jsonlite)
@@ -36,9 +36,9 @@ library(jsonlite)
 
 #Function to Retrieve data
 
-```{r FXgetdatapath}
+```{r FXGetAPIPath}
 
-GetAPICallbyNC<- function(endpoint, param){
+GetAPIPath<- function(endpoint, param){
  
 if (!(endpoint %in% (c("CS","CB", "BO")))){ 
   stop("Check your input")}  
@@ -54,17 +54,17 @@ if (!(endpoint %in% (c("CS","CB", "BO")))){
 #Get Characteristics of Business Data
    if (endpoint=="CB") { 
        endpath <- "https://api.census.gov/data/2020/abscb?"
-       varlist <- "get=BUSCHAR,CBSA,EMP_PCT,EMPSZFI,ETH_GROUP,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,QDESC,RACE_GROUP,RCPPDEMP,RCPSZFI,SECTOR,SEX,STATE,SUBSECTOR,SUMLEVEL,URSZFI,VET_GROUP,YEAR,YIBSZFI"
+       varlist <- "get=BUSCHAR,CBSA,EMP,EMPSZFI,ETH_GROUP,FIRMPDEMP,INDGROUP,INDLEVEL,PAYANN,QDESC,RACE_GROUP,RCPPDEMP,RCPSZFI,SECTOR,SEX,STATE,SUBSECTOR,SUMLEVEL,URSZFI,VET_GROUP,YEAR,YIBSZFI"
         #star after param gets all records beginnning with param value
-        path <- paste0(endpath,varlist,"&for=us:*&", param, "*&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
+        path <- paste0(endpath,varlist,"&for=us:*&", param, "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
     }
   
 #Get Business Owner Data  
-  #parameter = vet status 
+  #parameter = vet status - var removed from below.
   #OWNER_VET=002 for vets
   if (endpoint=="BO") { 
    endpath<-"https://api.census.gov/data/2020/abscbo?"
-   varlist <- "get=GEO_ID,NAME,NAICS2017,NAICS2017_LABEL,OWNER_SEX,OWNER_SEX_LABEL,OWNER_ETH,OWNER_ETH_LABEL,OWNER_RACE,OWNER_RACE_LABEL,OWNER_VET,OWNER_VET_LABEL,QDESC,QDESC_LABEL,OWNCHAR,OWNCHAR_LABEL,YEAR,OWNPDEMP"
+   varlist <- "get=GEO_ID,NAME,NAICS2017,NAICS2017_LABEL,OWNER_SEX,OWNER_SEX_LABEL,OWNER_ETH,OWNER_ETH_LABEL,OWNER_RACE,OWNER_RACE_LABEL,OWNER_VET_LABEL,QDESC,QDESC_LABEL,OWNCHAR,OWNCHAR_LABEL,YEAR,OWNPDEMP"
     path <- paste0(endpath,varlist,"&for=us:*&", param, "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
   }
 
@@ -78,14 +78,17 @@ return(path)
 ```{r FXgetrawdata}
 #Working
 GetMyRawData<-function (endpoint, param) {
-    path<-GetAPICallbyNC(endpoint, param)
-    #DELANEY - 3 THIS FAILS AND I THINK IT MAY BE BECAUSE OF HOW I AM PASSING STRING ...do the "" fall off?
+    path<-GetAPIPath(endpoint, param)
     data<-GET(path)
-    
+    #Check status of returned data
     a<-status_code(data)
+    #Code added - if statement
+    if (!(a==200)){
+        print(a)
+        stop("Data not Returned")
+      }
     print(a)
     invisible(data)
-    #return(data)
 }
 
 ```
@@ -124,13 +127,48 @@ invisible(new_data)
 }
 ```
 
+
+```{r FXChangeVars}
+ChangeVars<-function(my_df,endpoint) {
+#Converts all numeric variables from char to numeric
+#Converts categorical variables to factors
+  #COULD THIS BE CHAINED?
+    if (endpoint%in% c("CS","CB")) { 
+        #Create vector of numeric variables
+        number_vars<-c("PAYANN", "FIRMPDEMP", 
+                       "EMP", "RCPPDEMP")        
+        #Create vector of factor variables 
+        factor_vars<-c("EMPSZFI", "ETH_GROUP", "RCPSZFI",
+                       "URSZFI", "SEX", "VET_GROUP", "ETH_GROUP")
+        #Apply changes to my_df
+        my_df<-my_df %>% 
+          mutate(across(factor_vars,as.factor)) %>% 
+          mutate(across(number_vars, as.double))
+    }
+  
+  if (endpoint=="BO") { 
+        #Change the only numeric variable in the dataset
+        my_df$OWNPDEMP<-as.double(my_df$OWNPDEMP)
+        #Create vector of factor variables 
+        factor_vars<-c("OWNER_SEX", "OWNER_VET", 
+                       "OWNER_ETH","OWNER_RACE")
+        #Apply factor changes to my_df
+        my_df<-my_df %>% 
+            mutate(across(factor_vars,as.factor))  
+  } 
+   return(my_df)
+}  
+```
+
+
 ```{r datawrapper}
 GetData<-function(endpoint,param){
     a1<-GetMyRawData(endpoint, param)
     a2<-ConvertData(a1)
     a3<-CreateTibble(a2)
+    a4<-ChangeVars(a3,endpoint)
 #Return a dataset
- return(a3)    
+ return(a4)    
 }    
 
 ```
@@ -236,40 +274,10 @@ o1111<-o111[-1, ]
 ```
 
 
+Modifications to the first endpoint - Characteristics of Businesses Surveyed  
+- Select the industry Code to investigated
+- Sales receipts over a certain level
 
-Function to Change variable types  
-- There are 4 interger variables of interest in the Company Summaries endpoint:  
- *EMP*: Number of employees  
- *FIRMPDEMP*: The number of employer firms  
- *PAYANN*: The annual payroll  
- *RCPPDEMP*: Sales, shipments or revenue in ($000s)  
- 
 
-```{r FXconverttonumeric}
-#WORKING
-CV<-function(my_df,endpoint) {
-#Check User Input for valid values.
-  #Converts all numeric variables from char to numeric
-  #working as of 10/4
-if (!(endpoint %in% c("CS","CB", "BO"))){ stop("Check your input")}  
-if (endpoint=="CS") { 
-   my_df$PAYANN<-as.double(my_df$PAYANN)
-   my_df$FIRMPDEMP<-as.double(my_df$FIRMPDEMP)
-   my_df$EMP<-as.double(my_df$EMP)
-   my_df$RCPPDEMP<-as.double(my_df$RCPPDEMP)
-    }
-if (endpoint=="CB") { 
-   my_df$PAYANN<-as.double(my_df$PAYANN)
-   my_df$FIRMPDEMP<-as.double(my_df$FIRMPDEMP)
-   my_df$EMP<-as.double(my_df$EMP)
-   my_df$RCPPDEMP<-as.double(my_df$RCPPDEMP)
-    }
-  if (endpoint=="BO") { 
-   my_df$OWNPDEMP<-as.double(my_df$OWNPDEMP)
-       } 
-  
-   return(invisible(my_df))
-}  
-  
-```
+
 
