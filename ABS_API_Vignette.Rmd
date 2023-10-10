@@ -1,5 +1,5 @@
 ---
-title: "temp"
+title: "Census Bureau ABS API Vignette"
 author: "Lisa OConnell"
 date: "`r Sys.Date()`"
 output: html_document
@@ -14,54 +14,51 @@ REMEMBER TO CHANGE THE OUTPUT TYPE above AND CREATE RMD files
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-#Introduction  
-Data from the American Business Survey (ABS) conducted by the US CENSUS Bureau is explored in this vignette. The purpose of the vignette is to demonstrate access to multiple endpoints within the ABS data using a __X__ query parameters.  Additionally an Exploratory Data Analysis (EDA) is completed which includes both numeric and graphical summarizations.  This vignette was created and is shared using a GitHub repository and GitHub page.  
+## Introduction  
+Data from the American Business Survey (ABS) conducted by the US CENSUS Bureau is explored in this vignette. The purpose of the vignette is to demonstrate access to multiple endpoints within the ABS data using a several query parameters.  Additionally an Exploratory Data Analysis (EDA) is completed which includes both numeric and graphical summarizations.  This vignette was created and is shared using a GitHub repository and GitHub page.  
 
 
-# Description of Data  
+## Description of Data  
 __Endpoints Over Time__  
-The American Business Survey data represents aggregated responses from the ABS survey conducted in the prescribed year from the selected endpoint.
+The American Business Survey data represents aggregated responses from the ABS survey conducted in the prescribed year from the selected endpoint. The purpose of the ABS surveys are to provide a profile of businesses in America, with responses  tabulated across several classification categories. 
 
-The ABS data accessed for this vignette represents the endpoints for the year 2021 which contains data from the 2020 survey.  Additional endpoints are available for the years 2020-2018.   
+The ABS data accessed for this vignette represents the endpoints for the year 2021 which contains data from the 2020 survey.  Data from survey estimates for the years 2020-2018 are available.   
 
 
-__Endpoint Pathways:__  
--  Company Summaries: http://api.census.gov/data/2020/abscs   
--  Characteristics of Business: https://api.census.gov/data/2020/abscb  
+*Endpoint Pathways:*  
+CS Data: - Company Summaries: http://api.census.gov/data/2020/abscs   
+CB Data:-  Characteristics of Business: https://api.census.gov/data/2020/abscb  
 
   
 *Additional Endpoints Available*  
 An additional endpoint is available, but is not used in this vignette:  
--  Characteristics of Business Owners: https://api.census.gov/data/2020/abscbo  
-- Module Business Characteristics: https://api.census.gov/data/2020/absmcb  
+  -  Characteristics of Business Owners: https://api.census.gov/data/2020/abscbo  
+  - Module Business Characteristics: https://api.census.gov/data/2020/absmcb  
 
-__Data Categorizations  
-The ABS contains summarized data from survey respodants.  Data is available at the US, state and statistical area levels. This vignette uses data at the US level.  To provide a profile of businesses in America, responses are tabulated across several categories.  
+The ABS datasets contain summarized survey data from 2021 survey estimates.  Data is available at the US, state and statistical area levels. This vignette accesses data at the US level.   
 
-For this vignette, I will be looking a the following categories for Company Summaries:
-Industry, Sales/Receipts and reported Veteran Status
+Business data can be profiled using survey responses classifications related to the business owner including for example veteran stats, sex, & race.
 
-For the Business Owner data, I will look at......
-
-Both datasets can be further profiled by using survey responses classifications related to the business owner including for example veteran stats, sex, & race.
-
-Quantitative Variables for both endpoints include the number of employees and annual payroll expenses.  
+Quantitative variables the endpoints accessed in this vignette include estimated number of employees, a count of responding firms and estimated annual payroll expenses.  
 
 
-__Data Format:__
-As described in the ["CENSUS Data API User Guide"](https://www.census.gov/content/dam/Census/data/developers/api-user-guide/api-guide.pdf) The American Business Survey data returned through the API is a 2 dimensional JSON array formatted as shown below for 3 variables:  
+__Returned Data Format:__  
+As described in the ["CENSUS Data API User Guide"](https://www.census.gov/content/dam/Census/data/developers/api-user-guide/api-guide.pdf) The American Business Survey data is returned through an API via a 2 dimensional JSON array formatted as shown below for 3 variables:  
 
 [["EMP" ,"STATE", "PAYANN"]],  
 ["10000, "GA", "500000"],  
 ["5000, "TX", "650000"].... 
 
-Due to the way the categorical information is stored, the most practical way to efficiently deal with incoming data is to execute calls within the AP for the slices of data of interest.  As a result, a general function is not used to query all classifications in one data pull.  The tabulations by category are appended to the industry records making a full file difficult to parse. 
+  As a result, a general function has not used to query all classifications in one data pull.  More sophisticated programming techniques may be able to improve the data access functions, improving the efficiency and streamlining this code.  
+
 
 
 # Requirements: R Libraries  
-The following libraries are used to process access and process data in R.  The `tidyverse` library provides a set of packages relevant for data tidying, wrangling, and summarization.  The `httr` package provides functions to work with urls.  The `jsonlite`package provides functions to work with json data.  
+The following libraries are used to process access and process data in R.  The `tidyverse` library provides a set of packages relevant for data tidying, wrangling, and data summarization.  The `httr` package provides functions for manipulating urls.  The `jsonlite`package provides functions transfer of json data.
+The `pollster` package was included to faciliate cross tab summarizations of aggregated survey data. Finally, the `gghalves` package was included to create addtional graphing styles.  Select functions from `knitr` are used to create table output.
 
-```{r libraries}
+
+```{r libraries , warning=FALSE, echo=FALSE}
 library(tidyverse)
 library(httr)
 library(jsonlite)
@@ -69,92 +66,85 @@ library(jsonlite)
 library(pollster)
 #gghalves for additional plotting
 library(gghalves)
-
-
+#Turn off scientific notation
+options(scipen = 9999)
 ```
-
 
 # Functions to Retrieve ABS Data
 
-Several functions are created to facilitate data retrieval. These functions allow query arguments to be passed in to return specific results.  Wrapper functions are created to tidy data once received from the API call.  Do the the nature of the data returned through the API, which includes records at various levels of aggregation, I found it easier to execute a call for the data needed through the API, rather than undertaking extensive row wrangling in R.  This produced more reliable easier to follow datasets, although there is some redundant code in the path and wrangle sections.  I believe this may be rememedied with more sophisticated functions perhaps using unnamed arguments to handle the variance in the variables requested and returned. 
+Several functions are created to facilitate data retrieval. These functions allow query arguments to be passed in to select specific results.  Several helper functions are created to support the data wrangling and cleaning process. 
 
-BOth files use the NAICS2017 values as the highest level of aggreation. This values is a wildcard in all pulls and can be set to specific values as well.
+Wrapper functions are created to tidy data once received from the API call.  
 
-Summary of Functions:
+Due the the nature of the data returned through the API, which includes records at various levels of aggregation, I found it easier to execute a call for the data needed through the API, rather than undertaking extensive  wrangling in R.   This produced more reliable easier to follow datasets, although there is some redundant code in the path and wrangle sections.  I believe this may be remedied with more sophisticated functions to handle the variance in the variables requested and returned.   
 
-API CALLS to Characteristics of Companies Endpoint:
+The ABS data use the North American Industry Code System (NAICS2017) values as the highest level of aggregation.   
 
-`CSData` - creates API path, wrangles data into tidy tibble.  Arguments allow for modification of 2 values in the endpoint, with a default of a wildcard to allow it to be used as needed.  
+# Functions List 
+API Path Functions:  
+__CS_Data__ 
+`CSData` - A combined function to create an API path, wrangles data into tidy tibble. Arguments allow for modification of 2 values in the endpoint (veteran status and industry code), with a default of a wildcard to allow it to be used as needed.  
 
+__CB Data__  
+`CB_Path` 
+`CB_Data` - Retreives data from the Company Summaries endpoint.These funciton allows for modification of 2 values on the endpoint - industry code and veteran status.   
+A series of functions are created to access the characteristics of Business Endpoint. Again, in the future, it would be useful to consolidate these funcitons.  `
 
-
-Common Helper Funcitons
-`ConvertData`
-`CreateTibble`
-`Wrangle`
-`DeAgto4`
-
-API CALLS to Characteristics of Business Owners Enpoint
-All calls to the 
-
-`CBPATH` - `CB_InQsSx
-
-`
-It is also necessary to know the question codes for to pull from the CB data
-
-`
+*Common Helper Functions*  
+`ConvertData`   
+`CreateTibble`   
+`Wrangle`  
+`DeAgto4`   
+Additionally, a there are helper functions to modify the unique variables passed into each of the above functions to implicitly coerice variable types and create factors. 
 
 
+## Query parameters: 
 
+__NAICS2017__   The NAICS industry code is the primary subsetting variable for both datasets. It is from the 2017 NAICS table. The arguement for this queray parameter is labeled `industryCode=`. This value can take on any 2-4 digit representation of the NAICS table, using a "*" as a wildcard.
 
+__VET_GROUP__ A categorical variable that returns the status of the business owner as a veteran.  The query parameter for this function arguement is `vetStatus=`, and cand take on the value, of vet, nonvet, both, all or a wildcard. 
 
+__SEX__ - A categorical variable returning the sex of the business owner. This arguement is labeled `sex=` and can take on the value of male, female or all.
 
-function called `GetData` is created to contain the subfunctions needed to execute the API call (`GetAPIPath`,`GetMyRawData`), convert the data from JSON (INSERT FX), create a tidy tibble (`CreateTibble`), and reformat variables (`ChangeVars`).  
+__Survey Questions__  Survey responses are captured in the survey questions variables.  There are several survey questions to choose from, so it is impractical for this vignette to code user friendly descriptions for all survey questions.  A table of the survey question codes and the answer codes can be found on the ABS website here: [https://www.census.gov/data/developers/data-sets/abs.html](https://www.census.gov/data/developers/data-sets/abs.html).   
 
-The `GetAPIPath` function allows for multiple arguements to be passed in to specify query terms.  For the two endpoints used in this vignette, the following query parameters are allowed:
-
-*Characterics of Business data:*  
-Query parameters:
-
-__NAICS2017__   The NAICS industry code from the 2017 NAICS table. 
-
-__VET_GROUP__ A categorical variable that returns the status of the business owner as a veteran INSERT VALUES HERE
-
-__SEX__ - A categorical variable returning the sex of the business owner.
-
-__Survey Questions: Family Owned Businesses__ - A survey response value captured in the survey questions variables.  
-
-
-Naming Conventions:  
--Camelcase for variables and Functions  
-
--SnakeCase for Datasets  
-
-
-COMMENT FOR BLOG POST: The useful videos on CENUS website, and the ability to get more informative error codes by running the GET command directly into a browser.
-
-These functions will create a URL path the endpoint that contains the user input arguments for queries.
-
-Functions were built to have user friendly arguments which convert user input into ABS variable names and codes.  
+This vignette focuses on survey question "B02" related to businesses being either family run or not family operated.  The aruguement for this survey question is `bizAttrib=`.  
 
 
 
-## HELPER FUNCTIONS
+## Function Definitions  
+
+__User friendly inputs for functions:__  
+The following words are used as input to the functions. 
+
+`vetstatus = "all"` both non vet and vet business owners
+`vetstatus = "vet"` vet business owners
+`vetStatus = "both"` equally vet/nonvet ownership
+`vetstatus = "none"`  non vet 
+
+`sex=all` male, female and equal shared ownership
+`sex=female`female owners only
+`sex=male`male owners only
 
 
-```{r CSDataSat}
-#USE THIS!
 
-CSData<- function(vetStatus="*",industryCode="*") {
+```{r CSData}
+
+CSData<- function(vetStatus="all",industryCode="*") {
 #defaults are wildcard values
 
 #Defaults used to pull these variables when not specified by user. 
 endpath <- "https://api.census.gov/data/2020/abscs?"
-
 #A list of variable to return, excluding the query variables
-varlist <- "get=FIRMPDEMP,PAYANN,EMP,SECTOR,SUBSECTOR"
+varlist <- "get=FIRMPDEMP,PAYANN,EMP,RCPPDEMP,SECTOR,SUBSECTOR"
 
 #Parse the user-friendly 
+
+ switch(vetStatus, 
+       vet = {vtStat<-"002"},
+       nonvet = {vtStat<- "004"},
+       mixed = {vtStat<- "003"},
+       all = {vtStat<- "002&VET_GROUP=004&VET_GROUP=003"} )
 
 #Paste query variables to path
 path <- paste0(endpath,
@@ -164,31 +154,28 @@ path <- paste0(endpath,
               "&NAICS2017=",
                industryCode,
               "&VET_GROUP=",
-               vetStatus, 
+               vtStat, 
               "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
  
 raw_data <- GET(path)
 #Print status code of returned data
 a<-status_code(raw_data)
 print(a)
-
 my_df<-raw_data %>%
      Wrangle() %>%
      #Modify variable types
-     mutate(Firms = as.double(FIRMPDEMP), 
+     mutate(Firms = as.double(FIRMPDEMP),
+            Revenue = as.double(RCPPDEMP),
             Payroll = as.double(PAYANN),
             Employees = as.double(EMP)) %>% 
-      mutate(Industry = as.factor(NAICS2017), 
+     mutate(Industry = as.factor(NAICS2017), 
              SECTOR=as.factor(SECTOR), 
              SUBSECTOR= as.factor(SUBSECTOR),
-             VET_GROUP= as.factor(VET_GROUP)) %>%
-      DeAgto4()
-
+             VET_GROUP= as.factor(VET_GROUP))
 return(my_df)
 
 }
 ```
-
 
 ```{r FxConvertData}
 ConvertData<-function (myraw) {
@@ -228,438 +215,195 @@ invisible(new_data)
 
 ```{r WrangleWrapper}
 Wrangle<- function(my_df){
-          tidy_data <- my_df %>% 
-          ConvertData() %>% 
-          CreateTibble()
-        invisible(tidy_data)
+  number_vars<-c("PAYANN", "FIRMPDEMP",  "EMP")     
+
+    tidy_data <- my_df %>% 
+       ConvertData() %>% 
+       CreateTibble() %>% 
+       DeAgto4() %>% 
+       mutate(across(number_vars, as.double)) 
+   invisible(tidy_data)
 }
 
 ```
 
-```{r FXChangeVarsCS}
-#NOT USING SINCE CHANGED HOW DATA IS BEING PULLED
-
-#Function specific to the variables in the Characteristics of Business dataset
-#Converts all numeric variables from char to numeric
-#Converts categorical variables to factors
-
-ChangeVarsCS<-function(my_df) {
-  #Create vector of numeric variables
-  number_vars<-c("PAYANN", "FIRMPDEMP", 
-               "EMP", "RCPPDEMP")        
-  
-  #Create vector of factor variables 
-  factor_vars<-c("EMPSZFI", "RCPSZFI", 
-                "SEX", "VET_GROUP", 
-                "ETH_GROUP", "RACE_GROUP")
-  #Apply changes to my_df
-  my_df<-my_df %>% 
-      mutate(across(factor_vars,as.factor)) %>% 
-      mutate(across(number_vars, as.double))
-return(my_df)
-}  
-```
-
-```{r FXChangeVarsCB}
-#Function specific to the variables in the Characteristics of Business dataset
-#Converts all numeric variables from char to numeric
-#Converts categorical variables to factors
-
-ChangeVarsCB<-function(my_df) {
-
-  #Create vector of numeric variables
-  number_vars<-c("PAYANN", "FIRMPDEMP", 
-                  "EMP","SECTOR","SUBSECTOR")        
-  
-  #Create vector of factor variables 
-  factor_vars<-c("SEX", "VET_GROUP", 
-                 "SECTOR","SUBSECTOR")
-  
-  #Apply changes to my_df
-  my_df<-my_df %>% 
-      mutate(across(factor_vars,as.factor)) %>% 
-      mutate(across(number_vars, as.double))
-  
-  invisible(my_df)
-}  
-
-```
-
-
 ```{r FXDeaggregate}
-#Removes aggregated records to 4 digit NAICS codes.
+#Removes aggregated records to leave only 4 digit NAICS codes.
 #This is needed to remove duplicate counts that can occur when the wildcard* is used.
 DeAgto4<-function (a_df) {
 
     a <- a_df %>%
         filter(((nchar(NAICS2017)) > 3) &
-              ((substring(NAICS2017, 3,3)!="-")))
-    return (a)
-    
+               ((substring(NAICS2017, 3,3)!="-")))
+    invisible (a)
     }
 
 ```
 
-CB PATH FUNCTIONS
+```{r CB_Path}
+CB_Path<- function(bizAttrib="B02", bizAnswer="*", vets="all", industryCode="*", sx="all") {
 
-```{r GetCB_InQuSx_path}
+  #if (bizAttrib="999")  {stop("Please pick a survey question")}
 
-GetCB_InQuSx_path<- function(industryCode="*", bizAttrib="*", bizAnswer="*", sex="*") {
- #Wildcards used as defaults to pull these variables when not specified by user. 
+  endpath <- "https://api.census.gov/data/2020/abscb?"
+  varlist <- "get=QDESC_LABEL,BUSCHAR_LABEL,EMP,FIRMPDEMP,PAYANN,RCPPDEMP,SECTOR,SUBSECTOR"
 
- switch(sex, 
-     all = {SEX <- "002&SEX=003&SEX=004"},
-     male = {SEX <-"003"},
-     female = {SEX<- "002"})
-  
-  
-    endpath <- "https://api.census.gov/data/2020/abscb?"
-    varlist <- "get=EMP,FIRMPDEMP,PAYANN,SECTOR,SUBSECTOR,QDESC_LABEL,BUSCHAR_LABEL"
+   switch(vets, 
+       vet = {vtStat<-"002"},
+       nonvet = {vtStat<- "004"},
+       mixed = {vtStat<- "003"},
+       all = {vtStat<- "002&VET_GROUP=004&VET_GROUP=003"})
+     
+   switch(sx, 
+      all = {SEX <- "002&SEX=003&SEX=004"},
+      male = {SEX <-"003"},
+      female = {SEX<- "002"} )
 
-#star after param gets all records beginning with param value
   path <- paste0(endpath,varlist,
                 "&for=us:*",
-                 "&NAICS2017=",industryCode, 
-                 "&QDESC=",bizAttrib,
-                 "&BUSCHAR=", bizAnswer,
-                 "&SEX=", SEX,
-                 "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-    return(path)       
-}        
-```
-
-```{r Get_CB_InQu_path}
-#Does not work by sector
-Get_CB_InQu_path<- function( bizAttrib="*", bizAnswer="*", industryCode="*") {
-
-#Wildcards used as defaults to pull these variables when not specified by user. 
-
-endpath <- "https://api.census.gov/data/2020/abscb?"
-varlist <- "get=QDESC_LABEL,BUSCHAR_LABEL,EMP,FIRMPDEMP,PAYANN,SECTOR,SUBSECTOR,QDESC_LABEL,BUSCHAR_LABEL"
-
-#star after param gets all records beginning with param value
-path <- paste0(endpath,varlist,
-                "&for=us:*",
                 "&NAICS2017=", industryCode,
-                "&QDESC=", bizAttrib,
+                "&VET_GROUP=",vtStat,
+                "&SEX=", SEX,
+                "&QDESC=",bizAttrib,
                 "&BUSCHAR=", bizAnswer,
                 "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-return(path)    
 
-}        
+}
 ```
 
-```{r GetCB_QuSx_path}
-#Cleanest way to get the data
-GetCB_QuSx_path<- function ( bizAttrib="*", bizAnswer="*", sex="*") {
- #Wildcards used as defaults to pull these variables when not specified by user. 
-  #Sunday verified
-  
-  switch(sex, 
-         all = {SEX <- "002&SEX=003&SEX=004"},
-         male = {SEX <-"003"},
-         female = {SEX<- "002"})
-         
-  endpath <- "https://api.census.gov/data/2020/abscb?"
-  varlist <- "get=get=EMP,FIRMPDEMP,PAYANN,SECTOR,SUBSECTOR,NAICS2017,QDESC_LABEL,BUSCHAR_LABEL"
+```{r CB_Data}
+CB_Data<- function (path) {
 
-#star after param gets all records beginning with param value
-   path <- paste0(endpath,varlist,
-                "&for=us:*",
-                "&SEX=",SEX,
-                "&QDESC=",bizAttrib,
-                 "&BUSCHAR=", bizAnswer,
-                 "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-   return(path)    
-}        
-```
-
-```{r GetCB_InQuVet_Path}
-#Cleanest way to get the data
-GetCB_InQuVet_Path<- function( bizAttrib="*", bizAnswer="*", vetStatus="*",industryCode="*") {
-#Wildcards used as defaults to pull these variables 
-  #when not specified by user. #Sunday verified
- 
-  endpath <- "https://api.census.gov/data/2020/abscb?"
-  varlist <- "get=QDESC_LABEL,BUSCHAR_LABEL,EMP,FIRMPDEMP,PAYANN,SECTOR"
-
-   switch(vetStatus, 
-       all = {vtStat <- "002&VET_GROUP=003&VET_GROUP=004"},
-       vet = { vtStat<-"004"},
-       nonvet = {vtStat<- "002"},
-       same = {vtStat<- "003"})
-    
-#star after param gets all records beginning with param value
-  path <- paste0(endpath,varlist,
-                "&for=us:*",
-                "&NAICS2017=", industryCode,
-                "&VET_GROUP=",vtStatus,
-                "&QDESC=",bizAttrib,
-                 "&BUSCHAR=", bizAnswer,
-                 "&key=324a30368aa24fca02eb737c15d7c32c63c891cb")
-    return(path)    
-  
-  
-}        
-```
-
-
-```{r GetandCleanCB}
-#Working
-GetandCleanCB<- function (path) {
-
-rawcb <- GET(path)
+  rawcb <- GET(path)
    
-  #Print status code of returned data
+#Print status code of returned data
    a<-status_code(rawcb)
    print(a)
   
 #Tidy data
-   my_cb<-rawcb %>%
-     Wrangle() %>%
-     DeAgto4()
-return(my_cb)
-  }
-```
-
-
-
-
-
-```{r CBQDESC_Sex}
-#Cleanest way to return the data
-ChangeCBVarInQuSx<- function (my_df) {
-  
- #Variables to modify
-   number_vars<-c("PAYANN", "FIRMPDEMP","EMP")        
-   factor_vars<-c("SECTOR","SEX", "BUSCHAR")
-
- my_cb<-my_df %>%
-    mutate(across(factor_vars,as.factor)) %>% 
-    mutate(across(number_vars, as.double)) %>% 
-     
-   return(my_df)
-}
-```
-
-```{r ChangeCBVarInQuSx}
-#Cleanest way to return the data
-ChangeCBVarInQu<- function (my_df) {
-  
- #Variables to modify
-   number_vars<-c("PAYANN", "FIRMPDEMP",  "EMP")        
-   factor_vars<-c("SECTOR", "BUSCHAR")
-
-    my_cb<-my_df %>%
-    mutate(across(factor_vars,as.factor)) %>% 
-    mutate(across(number_vars, as.double)) %>% 
-     
-   return(my_df)
-}
-```
-
-```{r ChangeCBVarInQuSx}
-#Cleanest way to return the data
-ChangeCBVarQuSx<- function (my_df) {
-  
- #Variables to modify
-   number_vars<-c("PAYANN", "FIRMPDEMP",  "EMP")        
-   factor_vars<-c("SECTOR", "BUSCHAR", "SEX" )
-
- my_cb<-my_df %>%
-    mutate(across(factor_vars,as.factor)) %>% 
-    mutate(across(number_vars, as.double)) %>% 
-     
-   return(my_df)
-}
-```
-
-```{r ChangeCBVarInQuVt}
-#Cleanest way to return the data
-ChangeCBVarInQuVt<- function (my_df) {
-  
- #Variables to modify
-   number_vars<-c("PAYANN", "FIRMPDEMP",  "EMP")        
-   factor_vars<-c("SECTOR", "BUSCHAR", "VET_GROUP" )
-
- my_cb<-my_df %>%
-    mutate(across(factor_vars,as.factor)) %>% 
-    mutate(across(number_vars, as.double)) %>% 
-     
-   return(my_df)
-}
-```
-
-
-```{r ChangeCBVarQuSx}
-#Cleanest way to return the data
-ChangeCBVarQuSx<- function (my_df) {
-  
- #Variables to modify
-   number_vars<-c("PAYANN", "FIRMPDEMP","EMP")        
-   factor_vars<-c("SECTOR", "BUSCHAR", "SEX")
-
- my_cb<-my_df %>%
-    mutate(across(factor_vars,as.factor)) %>% 
-    mutate(across(number_vars, as.double)) %>% 
-     
-   return(my_df)
-}
-```
-
-```{r}
-Get
-
-```
-
-
-
-```{r CBQDESCVet OLD}
- #Cleanest way to return the data
-CBQDESCVet<- function (path) {
-
-   rawcb <- GET(path)
-
-   #Print status code of returned data
-    a<-status_code(rawcb)
-    print(a)
-   #Variables to modify
-      number_vars<-c("PAYANN", "FIRMPDEMP",  "EMP")
-      factor_vars<-c("SECTOR","SEX")
-   #Tidy data
-    my_cb<-rawcb %>%
+ 
+   my_df<-rawcb %>%
       Wrangle() %>%
-#       mutate(across(factor_vars,as.factor)) %>%
-#       mutate(across(number_vars, as.double)) %>%
-#       DeAgto4()
-   return(my_cb)
-}
+       DeAgto4() %>% 
+   #Modify variable types
+   mutate(Firms = as.double(FIRMPDEMP),
+            Revenue = as.double(RCPPDEMP),
+            Payroll = as.double(PAYANN),
+            Employees = as.double(EMP))     %>% 
+     mutate(Industry = as.factor(NAICS2017), 
+             SECTOR=as.factor(SECTOR), 
+             SUBSECTOR= as.factor(SUBSECTOR),
+             SEX= as.factor(SEX),
+             VET_GROUP= as.factor(VET_GROUP))
+invisible(my_df)
+  }
+
 ```
 
-
-
-## API Access Functions
-
-__User friendly inputs for functions:__
-`vetstatus = "all"` both non vet and vet business owners
-`vetstatus = "vet"` vet business owners
-`vetStatus = "equal"` equally vet/nonvet ownership
-`vetstatus = "none"`  non vet 
-
-`sex=all` male, female and equal shared ownership
-`sex=female`female owners only
-`sex=male`male owners only
-
-# Research Questions 
-
-## Company Summary Data
-RQ1 -  Pull Vets from CS, all industries - 1 pull , Overview of VET owned Businesses by sector
-Endpoint - Mod = Vet status
-
- Q2    - Pull from specific industry
- Endpoint mod = industry
-These represents modification of 2 value on the endpoint
-
-```{r CSDatavalidation }
-countpathcs<-"https://api.census.gov/data/2020/abscs?get=EMP,FIRMPDEMP,PAYANN&for=us:*&NAICS2017=*&key=324a30368aa24fca02eb737c15d7c32c63c891cb"
-count_cs<-GET(countpathcs)
-cnt_cs<-ConvertData(count_cs)
-cntcs2<-CreateTibble(cnt_cs)
-cntcs3<-cntcs2 %>% filter((nchar(NAICS2017)<3))
-cntcs3
-sum(as.double(cntcs3$FIRMPDEMP))
-```
-
-
+## Exploring the Company Summary Data  
 
 ### RQ1 - Review of Vet Owned Businesses
+The company summary endpoints allows us to profile businesses and business owners. 
+I have chosen to access the endpoint to review business ownsership by veterans across all industy secotrs.   
 
-Pull Data for all veterans to see where they have the largest presence across industry sectors.
-```{r RQ1DataSun }
+```{r RQ1DataSun, warning=FALSE }
+
 #This represent 1 modification of the CS endpoint, extracting by Vet status
+CS_AllVets<-CSData(vetStatus = "all", industryCode = "*")
 
-CS_AllVets<-CSData(vetStatus = "002", industryCode = "*")
 #Return Status of API pull displayed
+```
+
+Lets look at the nature of the variables stored in the dataset, along with 5 number summaries for quatitative values:
+```{r warning=FALSE}
+
+summary(CS_AllVets)
 
 ```
 
 ```{r RQ1SummariesSUN}
-#sat/sun this works
-
-#Total number of companies reporting vet owners:
-#For Testing
-#sum(CS_AllVets$Firms)
 
 #Create summarized dataset 
 VetsBySector<-CS_AllVets %>%
    group_by(SECTOR,VET_GROUP) %>% 
    summarize(Firms = sum(Firms))
-#For Testing
-  VetsBySector
 
 #Plot of veterans by sector
-g<- ggplot(VetsBySector,aes(SECTOR, Firms)) +
-  geom_col()+
+
+ggplot(VetsBySector,aes(SECTOR, Firms)) +
+  geom_col(fill= "#00AFBB")+
+  theme_light()+
   labs(title="Count of Firms Owned by Veterans by NAICS Industry Sector")
-g
 ```
 
 
-#RQ2: Pull Data within the Transporation Industry
+As the plot above shows, there are large concentrations of veterans in sector 23(Construction), 54(Scientific & Technincal Services), and 62 (Healthcare). Of course this is consistent with the overall size of the these sectors.   
+
+
+#RQ2: Pull Data within the Transporation Industry  
+
+Logistics and Transportation (Sector 48) is a growing area, and with that I was interesting in taking a look at this sector more closely.
 
 ```{r RQ2DataSUN}
 #Pull data for NAICS Industry Code = 48, Transporattion
 CS_48<-CSData(industryCode = "48*")
+
+#A succesful data pull returns a code of 200
 ```
 
-Analyze Transportation Sector:
+Once data has bee pulled, it is wrangled and cleaned:  
 ```{r RQ2Summaries}
-
 CS_48a<-CS_48 %>% 
-  #Remove aggregated records from dataset  
+  #Remove aggregated records from dataset where code =001 
   filter (VET_GROUP %in% c("002","003","004") )
-       # mutate(VetStatus=as.factor(VET_GROUP), SubSector=as.factor(SUBSECTOR)) 
-#Group by 3 Digit Subsector Code 481, 482 etc.    
+
+#Count firms
 CS_SubSectors<-CS_48a %>%      
     group_by(SUBSECTOR,VET_GROUP) %>% 
      summarize(TotFirms = sum(Firms))
-CS_SubSectors
- 
-#Show the distribition of Owners by veteran status
-    
-p1<-ggplot(CS_SubSectors, aes(SUBSECTOR,TotFirms, fill=VET_GROUP)) +
-     geom_col()
-p1
+
+
+#Show the distribition of business owners by veteran status
 
 CS_SubSectorEmps<-CS_48a %>%      
     group_by(SUBSECTOR,VET_GROUP) %>% 
-     summarize(TotEmps = sum(Employees)) +
+     summarize(TotEmps = sum(Employees)) %>% 
 
-p2<-ggplot(CS_SubSectorEmps, aes(SUBSECTOR,TotEmps, fill=VET_GROUP)) +
-     geom_col() +
-    labs(title="Total Firms by Veteran Classification",
-         x= "Industry NAICS Sector (2017)"+
+#Plot Firms
+ggplot(CS_SubSectors, aes(SUBSECTOR,TotFirms,fill=VET_GROUP))+
+  geom_col()+
+     labs(title="Total Firms by Veteran Classification in Transporation Sector",
+         x= "Industry NAICS Sector 2017",
          y= ("Number of Firms")) +
-         scale_fill_discrete("Veterans", "Vet/NonVet Partners", "NonVeterans")
-p2
-```
+         scale_fill_discrete(name="Veteran Status",
+                             labels=c("Veterans", "Vet/NonVet Partners", "NonVeterans"))+
+      theme_minimal()
+  
+#Plot Employees
+  ggplot(CS_SubSectorEmps, aes(SUBSECTOR,TotEmps,fill=VET_GROUP))+
+  geom_col()+
+     labs(title="Total Employees by Veteran Classification in Transporation Sector",
+         x= "Industry NAICS Sector 2017",
+         y= ("Number of Employees")) +
+         scale_fill_discrete(name="Veteran Status",
+                             labels=c("Veterans", "Vet/NonVet Partners", "NonVeterans"))+
+      theme_minimal()
 
+```
+As shown, sector 484, Truck Transportation is the largest and as would be expected also has the most number of firms owned by veterans.
 
 A Cross Tabulation of the number of firms owned by Veterans vs non by Sector
 
-```{r RQ2Crosstab}
+```{r RQ2Crosstab, warning=FALSE}
 
-#Because we the returned data from the API calls are already summarized, 
+#Because  the returned data from the API 
+#calls are already summarized, 
 #we can display crosstabs using dplyr
-#Un-summarize and display table (unnecessary)
-#or
-#Display the talbe using dplyr code
-#Display  cross table
 
 #An alternaitve option is to use the reported 
 # data to uncount and summarize, however this is memory
 #intensive and unnecessary.
-#Alternate method:  
+#Here is the alternate method:  
 # b<-CS_48 %>% 
 #  uncount(weights=.$Firms)
 #  b
@@ -674,204 +418,193 @@ a<-CS_48a %>%
    group_by(SUBSECTOR,VET_GROUP) %>% 
    summarize(nFirms=sum(Firms)) %>% 
    spread(VET_GROUP,nFirms,sep="_") %>% 
-   rename(NonVets= "VET_GROUP_002", "Equal_Owners"= "VET_GROUP_003", "VETs" = "VET_GROUP_004") %>% 
-#Print cross tab table
-a
+   rename(NonVets= "VET_GROUP_002", "Vet/NonVet_Owners"= "VET_GROUP_003", "VETs" = "VET_GROUP_004") 
+#Print the table
 
-knittr::kable(a,caption="Crosstab Count of Firms by Veteran Status in Sector 48")
+knitr::kable(a,caption="Crosstab Count of Firms by Veteran Status in Sector 48")
 ```
 
-Lastly, to summarize some of the quantitative information we have in the company data (employees, total firms, and annual payroll), I decided to look at the pay rates within the transportation industry.  We can look to see if they are appear visually different to guide a deeper analysis. 
+I decided to look at the pay rates within the transportation industry.  We can look to see if payrates  appear visually different to guide a deeper analysis. We will use the data that contains all vet status for owners. 
 
 
-```{r RQ2PayRates}
-#WORKS 
+```{r RQ2PayRates, warning=FALSE}
+# pay_df<-CS_48 %>% 
+#   group_by(SUBSECTOR,VET_GROUP) %>% 
+#     summarize(totpayroll= sum(Payroll), 
+#               TotEmps=sum(Employees)) %>% 
+#     mutate(AvgPayRate = (totpayroll*1000)/TotEmps) %>% 
+#     filter(AvgPayRate!="NaN" & SUBSECTOR!="NA") %>% 
+#     #simply to compare vet and not vet owner type firms 
+#     filter(VET_GROUP %in% c("002","004"))
+#Calculate avg annual pay by naics 4 digit code
+pay_df2<-CS_48 %>%
+    mutate(AvgAnnualPay= (Payroll*1000)/Employees) 
 
-pay_df<-CS_48 %>% 
-  group_by(SUBSECTOR,VET_GROUP) %>% 
-    summarize(totpayroll= sum(Payroll), TotEmps=sum(Employees)) %>% 
-    mutate(AvgPayRate = totpayroll/TotEmps) %>% 
-    filter(AvgPayRate!="NaN" & SUBSECTOR!="NA") %>% 
-    #simply compare vet and not vet owner type firms 
-   filter(VET_GROUP %in% c("002","004"))
-pay_df
+ggplot(pay_df2,aes(x=VET_GROUP,y=AvgAnnualPay)) +
+     geom_boxplot(fill="#00AFBB")+
+      theme_minimal()+
+      labs(title="Mean and Spread of Average Annual Pay in NACICS 48- Transporation Industry", 
+           subtitle= "Shown by Businesses Owner Veteran Status",
+            x="Veteran Status",
+            y="Average Annual Pay") +
+       scale_x_discrete(labels=(c("Veterans", "Co-Vet/NonVet", "NonVeterans")))
 
+# 
+# 
+# 
+# #Create a plot summarize
+# ggplot(pay_df,aes(x=SUBSECTOR,y=AvgPayRate)) +
+#       geom_density(alpha=.05,aes(fill=VET_GROUP), position="stack")
+#      # geom_boxplot(aes(color=VET_GROUP),fill="grey")
+#    geom_point(aes(colour=VET_GROUP)) +
+#        labs(title="Calculated Sector Payrate by Owner Type",
+#             x="NAICS Subsector Within the Transporation Industry") +
+#        scale_fill_discrete("Veteran Owners", "NonVeteran Owners")
+# 
+# 
+# ggplot(pay_df,aes(x=VET_GROUP,y=AvgPayRate)) +
+#      # geom_density(alpha=.05,aes(fill=VET_GROUP), position="stack")+
+#      theme_minimal()+
+#       labs(title="Mean and Spread of Average Annual Pay by Businesses Owned by Veterans and Nonveterans In The Transporation Sector",
+#        x="NAICS Subsector Within the Transporation Industry")+
+#    geom_boxplot(fill="#00AFBB")+
+#    scale_fill_discrete(name="Veteran Status",
+#                              labels=c("Veterans", "Vet/NonVet Partners", "NonVeterans"))
 
-p3<-ggplot(pay_df,aes(x=SUBSECTOR,y=AvgPayRate)) +
-     #One Continuous value, shown by vet status 
-     #  geom_density(alpha=.05,aes(fill=VET_GROUP), position="stack")
-     # geom_boxplot(aes(color=VET_GROUP),fill="grey")
-   geom_point(aes(colour=VET_GROUP)) +
-       labs(title="Calculated Sector Payrate by Owner Type",
-            x="NAICS Subsector Within the Transporation Industry") +
-       scale_fill_discrete("Veteran Owners", "NonVeteran Owners")
-p3
-
-p4<-ggplot(pay_df,aes(x=VET_GROUP,y=AvgPayRate)) +
-  #One Continuous value, shown by vet status 
-   #  geom_density(alpha=.05,aes(fill=VET_GROUP), position="stack")
-   geom_boxplot(fill="grey")+
-p4
  
 ```
 
---------------------
-## __Characteristics of Business Owners Data__
+As the chart shows, the mean annual pay based on the data from 4-digit codes for all transportation businesses appears higher for veterans. 
 
+__Exploration of Characteristics of Business (CB) Owners Data__  
 
-### Research Questions from the  __Characteristics of Business__ (CB)endpoint  
+The CB dataset allows us to better understand key attributes of business owners, for example whether businesses are family owned or franchised. These can be accessed by querying the specific survey question and their corresponding answers.  Given the structure of the dataset, it is necessary to know the survey question number to access this information.  My focus will be on family business characteristics which are captured in the ABS survey question labeled __"B02"__.  
 
-The CB dataset allows us to better understand key attributes of business owners, for example whether businesses are family owned or franchised. These can be accessed by selecting the QDESC survey question answers.  Given the structure of the dataset, it is necessary to know the survey question number to access this information.   
+To explore family business ownership, I started by looking at the number of firms owned by families across industry sectors to see if some sectors have higher percentage of family businesses.  
 
-Family Business characteristics are captured in the ABS survey question labeled "B02".  
-
-
-To explore family business ownership, I started by looking at the number of firms owned by families across industry sectors to see if some sectors have higher percentage of family businesses. Because these numbers are small, ....
-(describe the summmary chosem=n....)
-
-refine this exploration, we can look at these answers sliced by industry, vet status, and ans sales receipts. This adds,3 additional modification points to the endpoint queries.  
-
-Target mods to endpoint = 4
-
-RQ2a&b: Get High level Industry data (by Sector?) and table for vets/not, vets/not by sex, race
-RQ3: Get Vets by Industry, crosstabs on vets by industry, vet/sex by industry, vet/race by industry
-RQ4: Pull on BO QDESC - FamBiz and Franchise
-- RQ5:Pull by Vets, and Firmage to look at entrepreneurial efforts. - not a predicate var
-Instead look at age with a pull using sales receipts under 500K
-
-
-```{r CBDataValidation }
-#Data Validation
-countpath<-"https://api.census.gov/data/2020/abscb?get=EMP,FIRMPDEMP,PAYANN&for=us:*&NAICS2017=*&key=324a30368aa24fca02eb737c15d7c32c63c891cb"
-count_cb_df<-GET(countpath)
-cnt_cb<-ConvertData(count_cb_df)
-cnt2<-CreateTibble(cnt_cb)
-cnt3<-cnt2 %>% filter((nchar(NAICS2017)>3) & (substring(NAICS2017, 3,3)!="-") )
-cnt3
-sum(as.double(cnt3$FIRMPDEMP))
-```
-
-
-RQ_CB1  
-__Family owned businesses to explore by sector - Mod = 1, using a wildcard for the sector to pull all sectors. 
-
-
+First we must pull data from teh CB endpoint. I will use the wildcard * input for the NAICS code, and retrieve data survey results from question B02.
 ```{r fambysectordata}
 #Pull and wrangle family business data by sector
 #The NAICS wildcard value is used to get all sectors
-familypath2<-CB_QDESCPath(bizAttrib = "B02" )
-fambiz<-CBQDESC(familypath2)
+familypath<-CB_Path(bizAttrib = "B02" )
+fambiz<-CB_Data(familypath)
+
+#A code of 200 is returned if data is retreived,
 ```
 
 As the analysis below shows, family owned businesses as a share of total sector business owners are highest in the NAICS sector 22 (accounting for 62% of owners, although the number of firms here is small), Sector 44, a much larger sector where family owners represent 36% or over 87,000 firms.  Similar high numbers of firms are in sectors, 53, and 56. 
 
 ```{r fambysectoranalysis}
-#Done
-# fambysect<- fambiz %>% 
-#       #Remove summary rows from aggregated data         
-#       filter(BUSCHAR %in% c("BM","BN")) 
-# pollster::crosstab(fambysect, y=BUSCHAR_LABEL, x=SECTOR,weight=FIRMPDEMP)
+
+fambiz2<- fambiz %>% 
+       #Remove summary rows from aggregated data         
+       filter(BUSCHAR %in% c("BM","BN")) 
+
+t1<- pollster::crosstab(fambiz2, y=BUSCHAR_LABEL, x=SECTOR,weight=FIRMPDEMP)
+knitr::kable(t1,caption = "Crosstab Summary of Percent Slit of Family Owned Businesses by Sector")
 
 #For Family Owned Businesses:
-# BM<-fambysect %>% filter(BUSCHAR == "BM")
-# BN<-fambysect %>% filter(BUSCHAR == "BN")
+ BM<-fambiz2 %>% filter(BUSCHAR == "BM")
+ BN<-fambiz2 %>% filter(BUSCHAR == "BN")
 # 
-# #Use pollster function to display crosstables
-# #For Family Owned Businesses:
-# pollster::topline(BM, variable =SECTOR,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct = FALSE)
-# 
-# #For Non-Family Owned Businesses
-# pollster::topline(BN, variable =SECTOR,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct = FALSE)
+#Use pollster function to display crosstables
+#For Family Owned Businesses:
+t2<-pollster::topline(BM, variable =SECTOR,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct = FALSE)
+knitr::kable(t2, caption ="Count of Family Owned Businesses by Sector")
+t2
 
+# #For Non-Family Owned Businesses
+t3<-pollster::topline(BN, variable =SECTOR,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct = FALSE)
+knitr::kable(t3, caption ="Count NonFamlily Owned Businesses by Sector")
+t3
 ```
 
 To allow for another look at the data, we are able to split the data further by sex, to see if there are notable differences overall in the number of family owned businesses by owner sex. 
 
-
 Lets explore the number of family owned vs non-family owned businesses by owner sex (as defined as male, female, or equally share of owndership (male and female) ). Using the functions `CBDESCSexPath` and `CBQDESC_Sex` to pull by 2 modifications to the CB endpoint. The first modification references one of the questions asked on the survey, in this case the question related to family ownership. The second modification is to the categorical variable, sex.  
 
 ```{r FamOwnershipBySex}
-#Working
 
-#Pull data for all ownder sex values
-FS_path<-CBQDESCSexPath(bizAttrib = "B02", sex = "all")
-FS_df<-CBQDESC_Sex(FS_path)
+# #Display Crosstab
+ft1<-pollster::crosstab(fambiz2, y=SEX, x=SECTOR,weight=FIRMPDEMP)
+ft1<-ft1 %>% rename("Females"="002", "Males"= "004", "Mixed"="003")
 
-#Filter data to drop summary/aggregate/classifying rows
-FS_df2 <- FS_df %>% 
-   filter(BUSCHAR %in% c("BM", "BN"))
+knitr::kable(ft1,caption="Overall split of Family Owned Businesses by Sex" )
 
-#Display Crosstab
-a<-  pollster::crosstab(FS_df2, x=BUSCHAR_LABEL, y=SEX,weight=FIRMPDEMP, pct_type="cell")
-a<-a %>% rename("Males" = "002", "Females"="003")
-a
+#To unwieght the aggregated data for the geom_count plot. 
+#This geom doesn not take stat=identity
+b<-fambiz2%>% 
+ uncount(weights=.$Firms)
+ b
 
 #Plot the difference in the number of firms owned by sex
-fs_p<-ggplot(FS_df2,aes(y=FIRMPDEMP, x=BUSCHAR)) +
-  geom_col(aes(fill=SEX),position="dodge") +
-  labs(title= "Family Business Ownership by Owner Sex", 
-       x= "Family Owned vs Non-Family Owned Firms",
-       y= "Number of Firms") +
-  scale_fill_discrete(name = "Owner Sex", 
-                               labels = c("Male", "Female")) +
-  scale_x_discrete(labels = c("Family Ownded", "Not Family Owned") )
-#Display plot  
-fs_p
+ggplot(b,aes(SEX,SECTOR)) +
+  geom_count(color="magenta") +
+  labs(title= "Family Business Ownership by Sector & Owner Sex",
+       subtitle = "Dot Size Represents # Firms",
+       x= "Owner Sex",
+       y= "Sector")+
+    theme_light()
 
 
 fam3<-FS_df2 %>% 
     select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
      group_by(SECTOR,SEX,BUSCHAR) %>% 
     summarize(Firms = sum(FIRMPDEMP))
+   # rename("Family_Firms"="BM", "NonFamily_Firms"="BN")
 #Tables
 fam3
 #OR place these in nice tables using kable
-pollster::crosstab_3way(fam3, y=BUSCHAR, x=SECTOR,z=SEX, weight=Firms, format = "wide")
+t6<-pollster::crosstab_3way(fam3, y=BUSCHAR, x=SECTOR,z=SEX, weight=Firms, format = "wide")
+knitr::kable(t6, caption = "Split of Firms by Sector, Sex and Business Classification")
 
 ```
 
-Lastly, we can add one more endpoint modification to look at family business ownership, adding in veteran status as a classification variable.  Again, due to the nature of the returned data files, it is programatically easier to create a function for the additional endpoint modification.  The function we will use is `cb_QDesc_Industry_Sex_Race()`
+Lastly, we can add one more endpoint modification to look at family business ownership, adding in veteran status as a classification variable.  Again, due to the nature of the returned data files, it is programatically easier to create a function for the additional endpoint modification using the VET_CODE variable..  
 
+ADD ONE LAST PULL HERE!!! FIX THE CALL MAYBE MAKE THIS ABOUT FRANCISE? OWNEr VET STATUS NOT A PREDICATE
 
+```{r VetsBYIndsuryandFamilyBiz old}
+#THIS IS A GOOD GRAPH BUT NEEDS MORE DATA POINTS
+vet_fam_path<-Get_CB_InQuVet_path(vetStatus = "all",bizAttrib = "B02", bizAnswer = "BM", industryCode = "*")
+vet_fambiz_df<-GetandCleanCB(vet_fam_path)
+vet_fam_biz2<-ChangeCBVarInQuVt(vet_fambiz_df)
 
-
-```{r}
-#Need a data pull here....
-
-vet_fambiz_path<-CBQDESCVetPath(vetStatus = "002",bizAttrib = "B02", bizAnswer = "BM", industryCode = "*")
-vet_fambiz_df<-CBQDESC_Vet(vet_fambiz_path)
-
-h<-fambiz %>% 
-  filter((BUSCHAR %in% c("BM","BN"))) %>% 
-   filter(!(SECTOR %in% c("54", "44"))) %>%  
-#filter(EMPSZFI != "001") %>% 
-filter ((SEX %in% c("003", "002", "004"))) %>% 
-filter(VET_GROUP %in% c("002","004", "003")) 
-
-summary(h)
-
-  hz<-summarise(h,meanF=mean(FIRMPDEMP))     
-      
 
 # z<-pollster::topline(fambiz, variable =SECTOR,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct = FALSE)
 # rename(z,Industry=ResponsehFirms=Frequency)
-options(scipen=999)
-h2<-h %>% filter(SECTOR != "72") %>% 
-    mutate(payrate= PAYANN/EMP) %>% #%in% c("23", "53","48"))
-    filter(payrate!="NA")
-g6<-ggplot(h2, aes(x=SECTOR,y=payrate)) 
 
+#Prevent scientific notation
+options(scipen=999)
+
+#Calculate Payrates and remove NAs
+h2<-vet_fam_biz2 %>% 
+    mutate(payrate= PAYANN/EMP) %>% 
+    filter(payrate!="NA")
+
+#fix
+g6<-ggplot(h2, aes(x=SECTOR,y=payrate)) 
+g6
 g6+ geom_half_boxplot(side="l", center = TRUE, outlier.color = "blue") +
   facet_wrap(~BUSCHAR)+
   coord_flip()
 
-g7<-ggplot(h2, aes(x=BUSCHAR,y=payrate)) 
+#USE THIS:
+g7<-ggplot(h2, aes(x=BUSCHAR_LABEL,y=payrate)) 
 g7+ geom_half_boxplot(side="l", center = TRUE, outlier.color = "blue") +
  geom_half_point() +
+  facet_wrap(~SECTOR~VET_GROUP)+
+   coord_flip()
+  #theme_light()
 
-  facet_wrap(~SECTOR)+
-#  coord_flip()+
-  theme_light()
+#USE THIS:
+g8<-ggplot(h2, aes(x=SECTOR,y=payrate)) 
+g8+ geom_half_boxplot(side="l", center = TRUE, outlier.color = "blue") +
+ geom_half_point() +
+  facet_wrap(~VET_GROUP)+
+   coord_flip()
+  #theme_light()
+
 
 #HEAT MAP, BUT NOT THE RIGHT DATA FOR THIS
 plt<-ggplot(h2,aes(x=BUSCHAR,y=SECTOR,fill=EMP),na.rm=TRUE)
@@ -892,52 +625,52 @@ plt + geom_tile()
 
 ```{r}
 
-fambizCNT<-fambiz %>% 
-    filter(BUSCHAR %in% c("BM","BN"))    %>% 
-    select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
-    summarize(Firms = sum(FIRMPDEMP))
-#Number of Firms responding to this survey question:
-sum(fambizCNT$Firms)
-
-fam_by_sec<-fambiz %>% 
-      filter(BUSCHAR %in% c("BM","BN"))    %>% 
-     select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
-     group_by(SECTOR, BUSCHAR) %>% 
-    summarize(Firms = sum(FIRMPDEMP))
-#Table
-fam_by_sec
+# fambizCNT<-fambiz %>% 
+#     filter(BUSCHAR %in% c("BM","BN"))    %>% 
+#     select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
+#     summarize(Firms = sum(FIRMPDEMP))
+# #Number of Firms responding to this survey question:
+# sum(fambizCNT$Firms)
+# 
+# fam_by_sec<-fambiz %>% 
+#       filter(BUSCHAR %in% c("BM","BN"))    %>% 
+#      select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
+#      group_by(SECTOR, BUSCHAR) %>% 
+#     summarize(Firms = sum(FIRMPDEMP))
+# #Table
+# fam_by_sec
 
 #ambiz2<-fambiz %>%  filter(BUSCHAR %in% c("BM","BN")) 
 #pollster::topline(fam_by_sec, variable =BUSCHAR_LABEL,weight=Firms, valid_pct = FALSE,cum_pct = FALSE)
 
 
 #TWO WAY Crosstab, family owned by sex
-fambysec<- fambiz %>% 
-          filter(BUSCHAR %in% c("BM","BN") &
-             (SEX %in% c("002","003","004")) )
-pollster::crosstab(fam3, x=BUSCHAR_LABEL, y=SEX,weight=FIRMPDEMP)
-pollster::topline(fam3, variable =SEX,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct = FALSE)
+# fambysec<- fambiz %>% 
+#           filter(BUSCHAR %in% c("BM","BN") &
+#              (SEX %in% c("002","003","004")) )
+# pollster::crosstab(fam3, x=BUSCHAR_LABEL, y=SEX,weight=FIRMPDEMP)
+# pollster::topline(fam3, variable =SEX,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct = FALSE)
 
 ## 3 wAY TABLES
 #By Sector and Sex
 
 
 
-sum(fam3$Firms)
-#By Sector  Sex & Vet Status
-#Sector and Sex
-fam4<-fambiz %>% 
-      filter(BUSCHAR %in% c("BM","BN") &
-             (SEX %in% c("002","003","004")) &
-             (VET_GROUP %in% c("002","003","004"))) %>% 
-             
-     select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
-     group_by(SECTOR,SEX,VET_GROUP) %>% 
-    summarize(Firms = sum(FIRMPDEMP)) 
-    #spread(VET_GROUP,Firms,sep="_")
-
-#CONVERT THIS DF TO PLOT:
-fam4
+# sum(fam3$Firms)
+# #By Sector  Sex & Vet Status
+# #Sector and Sex
+# fam4<-fambiz %>%
+#       filter(BUSCHAR %in% c("BM","BN") &
+#              (SEX %in% c("002","003","004")) &
+#              (VET_GROUP %in% c("002","003","004"))) %>%
+# 
+#      select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>%
+#      group_by(SECTOR,SEX,VET_GROUP) %>%
+#     summarize(Firms = sum(FIRMPDEMP))
+#     #spread(VET_GROUP,Firms,sep="_")
+# 
+# #CONVERT THIS DF TO PLOT:
+# fam4
 
 
 ```
@@ -948,17 +681,17 @@ Looking at firm size by employees, and faceting by vet ownership.
 
 
 ```{r}
-qvpath<-CBQDESCVetPat(bizAttrib = "B02")
-qv_df<-CBQDESC_Vet(qvpath)
-
-#Data is correct
-qv_df2<-qv_df %>% 
-  filter(VET_GROUP %in% c("002", "003", "004")) %>% 
-  filter(BUSCHAR %in% c("BN", "BM")) %>% 
-  group_by(VET_GROUP,BUSCHAR) %>% 
-   summarize(Employees=sum(EMP))
-   #spread(VET_GROUP,nFirms,sep="_")
-view(qv_df2)
+# qvpath<-CBQDESCVetPat(bizAttrib = "B02")
+# qv_df<-CBQDESC_Vet(qvpath)
+# 
+# #Data is correct
+# qv_df2<-qv_df %>% 
+#   filter(VET_GROUP %in% c("002", "003", "004")) %>% 
+#   filter(BUSCHAR %in% c("BN", "BM")) %>% 
+#   group_by(VET_GROUP,BUSCHAR) %>% 
+#    summarize(Employees=sum(EMP))
+#    #spread(VET_GROUP,nFirms,sep="_")
+# view(qv_df2)
 
 # #Firm Size by Employee Distribution by Owner Type
 # #options(scipen = 999)
@@ -970,33 +703,33 @@ view(qv_df2)
 
 
 
-gqv<-ggplot(qv_df2, aes(Employees, fill=BUSCHAR))+
-  geom_col() +
-  labs(title = "Comparison of Firms by Employee Size",
-       subtitle= "Family Owned vs. Not-Family Owned Businesses")
-gqv
+# gqv<-ggplot(qv_df2, aes(Employees, fill=BUSCHAR))+
+#   geom_col() +
+#   labs(title = "Comparison of Firms by Employee Size",
+#        subtitle= "Family Owned vs. Not-Family Owned Businesses")
+# gqv
 # 
 ```
 
 
 Mod = 3
-```{r warnings=FALSE}
-
-vet_fambiz_path<-CBPath(vetStatus = "002",bizAttrib = "B02", bizAnswer = "BM")
-vet_fambiz_df<-CBSun(vet_fambiz_path)
-
-# vf_df<-vet_fambiz_df %>% 
-#      select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
-#     group_by(SECTOR) %>% 
-#    summarize(Firms = sum(FIRMPDEMP)) 
-#    # spread(BUSCHAR,Firms,sep="_")
-# #Table
-# vf_df
-# sum(vf_df$Firms)
-sum(vet_fambiz_df$FIRMPDEMP)
-
-#or
-pollster::topline(vet_fambiz_df, variable =SECTOR,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct = FALSE)
+# ```{r warnings=FALSE}
+# 
+# vet_fambiz_path<-CBPath(vetStatus = "002",bizAttrib = "B02", bizAnswer = "BM")
+# vet_fambiz_df<-CBSun(vet_fambiz_path)
+# 
+# # vf_df<-vet_fambiz_df %>% 
+# #      select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
+# #     group_by(SECTOR) %>% 
+# #    summarize(Firms = sum(FIRMPDEMP)) 
+# #    # spread(BUSCHAR,Firms,sep="_")
+# # #Table
+# # vf_df
+# # sum(vf_df$Firms)
+# sum(vet_fambiz_df$FIRMPDEMP)
+# 
+# #or
+# pollster::topline(vet_fambiz_df, variable =SECTOR,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct = FALSE)
 ```
 
 
@@ -1009,73 +742,22 @@ __Family Business by Industry and Vet:__
 
 
 ```{r warnings=FALSE}
-vet_fambiz_transp_path<-CBPath(vetStatus = "002",bizAttrib = "B02", bizAnswer = "BM", industryCode = "48*")
-vet_fambiz_transp<-CBSun(vet_fambiz_transp_path)
-
-vfbt<-vet_fambiz_transp %>% 
-     select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
-    group_by(SECTOR) %>% 
-   summarize(Firms = sum(FIRMPDEMP)) 
-   # spread(BUSCHAR,Firms,sep="_")
-vfbt
-sum(vfbt$Firms)
-
-
-```
-
-
-
-
-
-
-
-
-__EXTRA__
-
-Mod = 4a
-Analyze 
-
-```{r warnings=FALSE}
-# vet_fambiz_transp_path<-CBQDESCVetPath(vetStatus = "002",bizAttrib = "B02", bizAnswer = "BM", industryCode = "48*")
-# vet_fambiz_transp<-CBQDESC_Vet(vet_fambiz_transp_path)
-```
-
-```{r}
-# vt_df<-vet_fambiz_transp %>% 
+# vet_fambiz_transp_path<-CBPath(vetStatus = "002",bizAttrib = "B02", bizAnswer = "BM", industryCode = "48*")
+# vet_fambiz_transp<-CBSun(vet_fambiz_transp_path)
+# 
+# vfbt<-vet_fambiz_transp %>% 
 #      select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
-#       group_by(SUBSECTOR) %>% 
+#     group_by(SECTOR) %>% 
 #    summarize(Firms = sum(FIRMPDEMP)) 
 #    # spread(BUSCHAR,Firms,sep="_")
-# vt_df
-# sum(vt_df$Firms)
+# vfbt
+# sum(vfbt$Firms)
+
+
 ```
 
 
 
-```{r old}
-# #Pulls with wildcars
-# familypath2<-CBPath(bizAttrib = "B02" )
-# fambiz<-CBSun(familypath2)
-
-```
-
-Mod = 4b
-Analyze 
-
-```{r warnings=FALSE}
-# vet_fambiz_transp_female_path<-CBPath(vetStatus = "002",bizAttrib = "B02", bizAnswer = "BM", industryCode = "48*", sex = "002")
-# vet_fambiz_transp_female<-CBSun(vet_fambiz_transp_female_path)
-```
 
 
-
-```{r}
-# vftf_df<-vet_fambiz_transp_female %>% 
-#      select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
-#       group_by(SUBSECTOR) %>% 
-#    summarize(Firms = sum(FIRMPDEMP)) 
-#    # spread(BUSCHAR,Firms,sep="_")
-# vftf
-# sum(vt_df$Firms)
-```
 
