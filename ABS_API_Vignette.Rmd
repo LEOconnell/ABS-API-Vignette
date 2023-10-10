@@ -294,6 +294,7 @@ CB_Data<- function (path) {
              SECTOR=as.factor(SECTOR), 
              SUBSECTOR= as.factor(SUBSECTOR),
              SEX= as.factor(SEX),
+             BUSCHAR= as.factor(BUSCHAR),
              VET_GROUP= as.factor(VET_GROUP))
 invisible(my_df)
   }
@@ -353,21 +354,19 @@ CS_48<-CSData(industryCode = "48*")
 
 Once data has bee pulled, it is wrangled and cleaned:  
 ```{r RQ2Summaries}
-CS_48a<-CS_48 %>% 
-  #Remove aggregated records from dataset where code =001 
-  filter (VET_GROUP %in% c("002","003","004") )
+
 
 #Count firms
-CS_SubSectors<-CS_48a %>%      
+CS_SubSectors<-CS_48 %>%      
     group_by(SUBSECTOR,VET_GROUP) %>% 
      summarize(TotFirms = sum(Firms))
 
 
-#Show the distribition of business owners by veteran status
+#Show the distribution of business owners by veteran status
 
-CS_SubSectorEmps<-CS_48a %>%      
+CS_SubSectorEmps<-CS_48 %>%      
     group_by(SUBSECTOR,VET_GROUP) %>% 
-     summarize(TotEmps = sum(Employees)) %>% 
+     summarize(TotEmps = sum(Employees))
 
 #Plot Firms
 ggplot(CS_SubSectors, aes(SUBSECTOR,TotFirms,fill=VET_GROUP))+
@@ -414,7 +413,7 @@ A Cross Tabulation of the number of firms owned by Veterans vs non by Sector
 # Cross Tab using dplyr code
 #The spread() command is superceded, but seems
 # to work very well here instead of pivot_wider.
-a<-CS_48a %>% 
+a<-CS_48 %>% 
    group_by(SUBSECTOR,VET_GROUP) %>% 
    summarize(nFirms=sum(Firms)) %>% 
    spread(VET_GROUP,nFirms,sep="_") %>% 
@@ -544,12 +543,13 @@ ggplot(b,aes(SEX,SECTOR)) +
        subtitle = "Dot Size Represents # Firms",
        x= "Owner Sex",
        y= "Sector")+
+    scale_x_discrete(labels=(c("Female", "Male", "Joint Owned Male/Female")))
     theme_light()
 
 
-fam3<-FS_df2 %>% 
-    select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
-     group_by(SECTOR,SEX,BUSCHAR) %>% 
+fam3<-fambiz2 %>%
+    select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>%
+     group_by(SECTOR,SEX,BUSCHAR) %>%
     summarize(Firms = sum(FIRMPDEMP))
    # rename("Family_Firms"="BM", "NonFamily_Firms"="BN")
 #Tables
@@ -560,204 +560,46 @@ knitr::kable(t6, caption = "Split of Firms by Sector, Sex and Business Classific
 
 ```
 
-Lastly, we can add one more endpoint modification to look at family business ownership, adding in veteran status as a classification variable.  Again, due to the nature of the returned data files, it is programatically easier to create a function for the additional endpoint modification using the VET_CODE variable..  
+Let's go back to the transporation sector and evaluate family owned businesses. We can add one more endpoint modification to look at family business own.
 
-ADD ONE LAST PULL HERE!!! FIX THE CALL MAYBE MAKE THIS ABOUT FRANCISE? OWNEr VET STATUS NOT A PREDICATE
+For demonstration purposes, lets again pull family business data down from the CB endpoint again, this time using the veteran status modififier, and industry code. We will filter the data to remove the high level aggregation rows present in this data (e.g. stratification totals, classifiable, unclassifiable counts)
 
-```{r VetsBYIndsuryandFamilyBiz old}
-#THIS IS A GOOD GRAPH BUT NEEDS MORE DATA POINTS
-vet_fam_path<-Get_CB_InQuVet_path(vetStatus = "all",bizAttrib = "B02", bizAnswer = "BM", industryCode = "*")
-vet_fambiz_df<-GetandCleanCB(vet_fam_path)
-vet_fam_biz2<-ChangeCBVarInQuVt(vet_fambiz_df)
+```{r}
+CB_48path<-CB_Path(vets = "all", industryCode = "48*", bizAttrib = "B02")
+CB_48Data<-CB_Data(CB_48path)
 
-
-# z<-pollster::topline(fambiz, variable =SECTOR,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct = FALSE)
-# rename(z,Industry=ResponsehFirms=Frequency)
-
-#Prevent scientific notation
-options(scipen=999)
-
-#Calculate Payrates and remove NAs
-h2<-vet_fam_biz2 %>% 
-    mutate(payrate= PAYANN/EMP) %>% 
-    filter(payrate!="NA")
-
-#fix
-g6<-ggplot(h2, aes(x=SECTOR,y=payrate)) 
-g6
-g6+ geom_half_boxplot(side="l", center = TRUE, outlier.color = "blue") +
-  facet_wrap(~BUSCHAR)+
-  coord_flip()
-
-#USE THIS:
-g7<-ggplot(h2, aes(x=BUSCHAR_LABEL,y=payrate)) 
-g7+ geom_half_boxplot(side="l", center = TRUE, outlier.color = "blue") +
- geom_half_point() +
-  facet_wrap(~SECTOR~VET_GROUP)+
-   coord_flip()
-  #theme_light()
-
-#USE THIS:
-g8<-ggplot(h2, aes(x=SECTOR,y=payrate)) 
-g8+ geom_half_boxplot(side="l", center = TRUE, outlier.color = "blue") +
- geom_half_point() +
-  facet_wrap(~VET_GROUP)+
-   coord_flip()
-  #theme_light()
-
-
-#HEAT MAP, BUT NOT THE RIGHT DATA FOR THIS
-plt<-ggplot(h2,aes(x=BUSCHAR,y=SECTOR,fill=EMP),na.rm=TRUE)
-plt + geom_tile()
-
-#THIS WORKS BUT WOULD BE BETTER WITH SECTOR DATA
-# gqv<-ggplot(qv_df2, aes(y=Employees, x=BUSCHAR,fill=VET_GROUP))+
-#   geom_col(stat="identity") +
-#   labs(title = "Comparison of Firms by Employee Size",
-#        subtitle= "Family Owned vs. Not-Family Owned Businesses") 
-# gqv
+#Filter to remove aggregation rows
+CB_48Data<-CB_48Data %>% 
+ filter(BUSCHAR %in% c("BM","BN")) 
 
 ```
-
------------------
-
-
+Let's see how veterans owners are presented across family business classifications.Summarize the frequency of ownership by Vet Status and Family Business status.
 
 ```{r}
 
-# fambizCNT<-fambiz %>% 
-#     filter(BUSCHAR %in% c("BM","BN"))    %>% 
-#     select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
-#     summarize(Firms = sum(FIRMPDEMP))
-# #Number of Firms responding to this survey question:
-# sum(fambizCNT$Firms)
-# 
-# fam_by_sec<-fambiz %>% 
-#       filter(BUSCHAR %in% c("BM","BN"))    %>% 
-#      select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
-#      group_by(SECTOR, BUSCHAR) %>% 
-#     summarize(Firms = sum(FIRMPDEMP))
-# #Table
-# fam_by_sec
-
-#ambiz2<-fambiz %>%  filter(BUSCHAR %in% c("BM","BN")) 
-#pollster::topline(fam_by_sec, variable =BUSCHAR_LABEL,weight=Firms, valid_pct = FALSE,cum_pct = FALSE)
+tt<-pollster::crosstab(CB_48Data, x=BUSCHAR_LABEL, y=VET_GROUP,weight=FIRMPDEMP)
+knitr::kable(tt, title="Crosstabulation By Business Type (Family/Not Family Owned) and Veteran Status of Owners")
 
 
-#TWO WAY Crosstab, family owned by sex
-# fambysec<- fambiz %>% 
-#           filter(BUSCHAR %in% c("BM","BN") &
-#              (SEX %in% c("002","003","004")) )
-# pollster::crosstab(fam3, x=BUSCHAR_LABEL, y=SEX,weight=FIRMPDEMP)
-# pollster::topline(fam3, variable =SEX,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct = FALSE)
-
-## 3 wAY TABLES
-#By Sector and Sex
-
-
-
-# sum(fam3$Firms)
-# #By Sector  Sex & Vet Status
-# #Sector and Sex
-# fam4<-fambiz %>%
-#       filter(BUSCHAR %in% c("BM","BN") &
-#              (SEX %in% c("002","003","004")) &
-#              (VET_GROUP %in% c("002","003","004"))) %>%
-# 
-#      select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>%
-#      group_by(SECTOR,SEX,VET_GROUP) %>%
-#     summarize(Firms = sum(FIRMPDEMP))
-#     #spread(VET_GROUP,Firms,sep="_")
-# 
-# #CONVERT THIS DF TO PLOT:
-# fam4
-
-
+pollster::topline(CB_48Data, variable =VET_GROUP,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct =FALSE)
 ```
 
-
-Looking at firm size by employees, and faceting by vet ownership.
-
-
+No let's  visualize graphically this stratification of the Transportation Industry data. 
 
 ```{r}
-# qvpath<-CBQDESCVetPat(bizAttrib = "B02")
-# qv_df<-CBQDESC_Vet(qvpath)
-# 
-# #Data is correct
-# qv_df2<-qv_df %>% 
-#   filter(VET_GROUP %in% c("002", "003", "004")) %>% 
-#   filter(BUSCHAR %in% c("BN", "BM")) %>% 
-#   group_by(VET_GROUP,BUSCHAR) %>% 
-#    summarize(Employees=sum(EMP))
-#    #spread(VET_GROUP,nFirms,sep="_")
-# view(qv_df2)
+temp_df <-CB_48Data %>% 
+           group_by(BUSCHAR,VET_GROUP) %>% 
+           summarize(TotFirms = sum(FIRMPDEMP),
+                     AvgAnnPayrollinThs= sum(PAYANN),
+                     TotEmps= sum(EMP))
 
-# #Firm Size by Employee Distribution by Owner Type
-# #options(scipen = 999)
-# gq<-ggplot(qv_df2, aes(Employees, fill=BUSCHAR))+
-#   geom_density() +
-#   labs(title = "Comparison of Firms by Employee Size",
-#        subtitle= "Family Owned vs. Not-Family Owned Businesses") 
-# gq
-
-
-
-# gqv<-ggplot(qv_df2, aes(Employees, fill=BUSCHAR))+
-#   geom_col() +
-#   labs(title = "Comparison of Firms by Employee Size",
-#        subtitle= "Family Owned vs. Not-Family Owned Businesses")
-# gqv
-# 
+knitr::kable(temp_df,title="Stratification of Family Businesses by Owner Veteran Status ")
+#Show graphically
+ggplot(CB_48Data, aes(VET_GROUP,BUSCHAR),color="blue") +
+ geom_jitter() +
+  labs(title= "Family Business Ownership by Veteran Status",
+       subtitle = "Dot Size Represents # Firms",
+       x= "Owner Veteran Status",
+       y= "Business Type")
+  #  scale_x_discrete(labels=(c("Female", "Male", "Joint Owned Male/Female")))
 ```
-
-
-Mod = 3
-# ```{r warnings=FALSE}
-# 
-# vet_fambiz_path<-CBPath(vetStatus = "002",bizAttrib = "B02", bizAnswer = "BM")
-# vet_fambiz_df<-CBSun(vet_fambiz_path)
-# 
-# # vf_df<-vet_fambiz_df %>% 
-# #      select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
-# #     group_by(SECTOR) %>% 
-# #    summarize(Firms = sum(FIRMPDEMP)) 
-# #    # spread(BUSCHAR,Firms,sep="_")
-# # #Table
-# # vf_df
-# # sum(vf_df$Firms)
-# sum(vet_fambiz_df$FIRMPDEMP)
-# 
-# #or
-# pollster::topline(vet_fambiz_df, variable =SECTOR,weight=FIRMPDEMP, valid_pct = FALSE,cum_pct = FALSE)
-```
-
-
-Individual Facets:
-
-
-
-__Family Business by Industry and Vet:__
-
-
-
-```{r warnings=FALSE}
-# vet_fambiz_transp_path<-CBPath(vetStatus = "002",bizAttrib = "B02", bizAnswer = "BM", industryCode = "48*")
-# vet_fambiz_transp<-CBSun(vet_fambiz_transp_path)
-# 
-# vfbt<-vet_fambiz_transp %>% 
-#      select(SECTOR,SUBSECTOR, FIRMPDEMP,EMP,BUSCHAR, everything()) %>% 
-#     group_by(SECTOR) %>% 
-#    summarize(Firms = sum(FIRMPDEMP)) 
-#    # spread(BUSCHAR,Firms,sep="_")
-# vfbt
-# sum(vfbt$Firms)
-
-
-```
-
-
-
-
-
-
