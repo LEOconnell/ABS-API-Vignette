@@ -3,10 +3,6 @@ Census Bureau ABS API Vignette
 Lisa O’Connell
 2023-10-11
 
-``` r
-knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
-```
-
 ## Introduction
 
 Data from the American Business Survey (ABS) conducted by the US Census
@@ -91,6 +87,24 @@ Select functions from `knitr` are used to create table output.
 `library(pollster)`  
 `library(gghalves)`
 
+    ## -- Attaching core tidyverse packages ------------------------ tidyverse 2.0.0 --
+    ## v dplyr     1.1.2     v readr     2.1.4
+    ## v forcats   1.0.0     v stringr   1.5.0
+    ## v ggplot2   3.4.2     v tibble    3.2.1
+    ## v lubridate 1.9.2     v tidyr     1.3.0
+    ## v purrr     1.0.1     
+    ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
+    ## x dplyr::filter() masks stats::filter()
+    ## x dplyr::lag()    masks stats::lag()
+    ## i Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+    ## 
+    ## Attaching package: 'jsonlite'
+    ## 
+    ## 
+    ## The following object is masked from 'package:purrr':
+    ## 
+    ##     flatten
+
 # Functions to Retrieve ABS Data
 
 Several functions are created to facilitate data retrieval. These
@@ -129,7 +143,7 @@ labeled `industryCode=`. This value can take on any 2-4 digit
 representation of the NAICS table, using a “\*” as a wildcard.
 
 The NAICS 2017 table used is available here:
-<https://www.census.gov/naics/?48967>
+<https://www.census.gov/naics/?58967?yearbck=2017>
 
 **VETERAN STATUS-** A categorical variable that returns the status of
 the business owner as a veteran. The query parameter for this function
@@ -368,6 +382,39 @@ CS_all<-CSData(vets = "all", industryCode = "*")
 
     ## [1] 200
 
+    ## Warning: The `x` argument of `as_tibble.matrix()` must have unique column names if
+    ## `.name_repair` is omitted as of tibble 2.0.0.
+    ## i Using compatibility `.name_repair`.
+    ## This warning is displayed once every 8 hours.
+    ## Call `lifecycle::last_lifecycle_warnings()` to see where this warning was
+    ## generated.
+
+    ## Warning: Using an external vector in selections was deprecated in tidyselect 1.1.0.
+    ## i Please use `all_of()` or `any_of()` instead.
+    ##   # Was:
+    ##   data %>% select(num_cols)
+    ## 
+    ##   # Now:
+    ##   data %>% select(all_of(num_cols))
+    ## 
+    ## See <https://tidyselect.r-lib.org/reference/faq-external-vector.html>.
+    ## This warning is displayed once every 8 hours.
+    ## Call `lifecycle::last_lifecycle_warnings()` to see where this warning was
+    ## generated.
+
+    ## Warning: There was 1 warning in `mutate()`.
+    ## i In argument: `across(number_vars, as.double)`.
+    ## Caused by warning:
+    ## ! Using an external vector in selections was deprecated in tidyselect 1.1.0.
+    ## i Please use `all_of()` or `any_of()` instead.
+    ##   # Was:
+    ##   data %>% select(number_vars)
+    ## 
+    ##   # Now:
+    ##   data %>% select(all_of(number_vars))
+    ## 
+    ## See <https://tidyselect.r-lib.org/reference/faq-external-vector.html>.
+
 ``` r
 #Return Status of API pull displayed - 200 is successful pull
 ```
@@ -412,7 +459,11 @@ summary(CS_all)
     ##  1152   :  3  
     ##  (Other):804
 
-The chart below shows the firm distribution by 2 digit NAICS sector.
+The chart below shows the firm distribution by 2 digit NAICS sector. The
+chart below shows the number of firms operating by industry sector. Some
+of the largest sectors have the largest firm populations include sector
+54 (Professional Scientific and Techical Services, 23 - Construction,
+and 62 Healthcare for returned data.
 
 ``` r
 #Firm Population by Sector
@@ -432,7 +483,7 @@ ggplot(all_sector, aes(Firms, SECTOR)) +
 Let’s look at the the distribution of veteran owned firms. This
 represents one modification to the endpoint.
 
-### Resesarch Question 2 - Distribution of Veteran Owned Firms Across Sectors
+### RQ2 - Distribution of Veteran Owned Firms Across Sectors
 
 I have chosen to access the endpoint to review business ownership by
 veterans across all industry sectors.
@@ -512,13 +563,23 @@ Transportation.
 CS_SubSectors<-CS_48 %>%      
     group_by(SUBSECTOR,VET_GROUP) %>% 
      summarize(TotFirms = sum(Firms))
+```
 
+    ## `summarise()` has grouped output by 'SUBSECTOR'. You can override using the
+    ## `.groups` argument.
+
+``` r
 #Show the distribution of business owners by veteran status
 
 CS_SubSectorEmps<-CS_48 %>%      
     group_by(SUBSECTOR,VET_GROUP) %>% 
      summarize(TotEmps = sum(Employees))
+```
 
+    ## `summarise()` has grouped output by 'SUBSECTOR'. You can override using the
+    ## `.groups` argument.
+
+``` r
 #Plot Firms
 ggplot(CS_SubSectors, aes(SUBSECTOR,TotFirms,fill=VET_GROUP))+
   geom_col()+
@@ -544,7 +605,7 @@ ggplot(CS_SubSectors, aes(SUBSECTOR,TotFirms,fill=VET_GROUP))+
       theme_minimal()
 ```
 
-![](ABS_API_Vignette_files/figure-gfm/unnamed-chunk-6-2.png)<!-- -->
+![](ABS_API_Vignette_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
 
 Let’s look at those summaries using crosstabs as an alternate way to
 view the data.  
@@ -559,8 +620,9 @@ a<-CS_48 %>%
    summarize(nFirms=sum(Firms)) %>% 
    spread(VET_GROUP,nFirms,sep="_") %>% 
    rename("Vets_Firms" ="VET_GROUP_002", "JointVetNonVet_Firms"= "VET_GROUP_003", "NonVets_Firms" = "VET_GROUP_004")
-   
+```
 
+``` r
 #Print the table
 knitr::kable(a,caption="Crosstab Count of Firms by Veteran Status in Sector 48")
 ```
@@ -583,7 +645,12 @@ b<-CS_48 %>%
    summarize(nEmployees=sum(Employees)) %>% 
    spread(VET_GROUP,nEmployees,sep="_") %>% 
     rename("Vets_Emps" ="VET_GROUP_002", "JointVet/NonVet_Emps"= "VET_GROUP_003", "NonVets_Emps" = "VET_GROUP_004")
- 
+```
+
+    ## `summarise()` has grouped output by 'SUBSECTOR'. You can override using the
+    ## `.groups` argument.
+
+``` r
 #Print the table
 knitr::kable(b,caption="Crosstab Count of Employees Working By Veteran Status in Sector 48")
 ```
@@ -884,8 +951,13 @@ ggplot(sal_comp , aes( y=salary, fill=VET_GROUP)) +
   facet_wrap(~BUSCHAR)+
    labs(title= "Annual Pay By Business Owner Type in Sector 48",
           x= "Owner Sex",
-          y= "Sector") +
+          y= "Annual Pay/Employee") +
     theme_light()
 ```
 
-![](ABS_API_Vignette_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+    ## Warning in geom_half_dotplot(side = "r"): Ignoring unknown parameters: `side`
+
+    ## Bin width defaults to 1/30 of the range of the data. Pick better value with
+    ## `binwidth`.
+
+![](ABS_API_Vignette_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->

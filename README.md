@@ -579,8 +579,6 @@ a<-CS_48 %>%
    rename("Vets_Firms" ="VET_GROUP_002", "JointVetNonVet_Firms"= "VET_GROUP_003", "NonVets_Firms" = "VET_GROUP_004")
 ```
 
-**Crosstab Count of Firms by Veteran Status in Sector 48**
-
 ``` r
 #Print the table
 knitr::kable(a,caption="Crosstab Count of Firms by Veteran Status in Sector 48")
@@ -597,8 +595,6 @@ knitr::kable(a,caption="Crosstab Count of Firms by Veteran Status in Sector 48")
 | 488       |       1419 |                    0 |         31728 |
 
 Crosstab Count of Firms by Veteran Status in Sector 48
-
-**Crosstab Count of Employees Working By Veteran Status in Sector 48**
 
 ``` r
 b<-CS_48 %>% 

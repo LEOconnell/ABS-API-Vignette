@@ -1066,8 +1066,6 @@ tables.</p>
 <span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a>   <span class="fu">summarize</span>(<span class="at">nFirms=</span><span class="fu">sum</span>(Firms)) <span class="sc">%&gt;%</span> </span>
 <span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a>   <span class="fu">spread</span>(VET_GROUP,nFirms,<span class="at">sep=</span><span class="st">&quot;_&quot;</span>) <span class="sc">%&gt;%</span> </span>
 <span id="cb27-7"><a href="#cb27-7" tabindex="-1"></a>   <span class="fu">rename</span>(<span class="st">&quot;Vets_Firms&quot;</span> <span class="ot">=</span><span class="st">&quot;VET_GROUP_002&quot;</span>, <span class="st">&quot;JointVetNonVet_Firms&quot;</span><span class="ot">=</span> <span class="st">&quot;VET_GROUP_003&quot;</span>, <span class="st">&quot;NonVets_Firms&quot;</span> <span class="ot">=</span> <span class="st">&quot;VET_GROUP_004&quot;</span>)</span></code></pre></div>
-<p><strong>Crosstab Count of Firms by Veteran Status in Sector
-48</strong></p>
 <div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a><span class="co">#Print the table</span></span>
 <span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(a,<span class="at">caption=</span><span class="st">&quot;Crosstab Count of Firms by Veteran Status in Sector 48&quot;</span>)</span></code></pre></div>
 <table>
@@ -1125,8 +1123,6 @@ tables.</p>
 </tbody>
 </table>
 <p>Crosstab Count of Firms by Veteran Status in Sector 48</p>
-<p><strong>Crosstab Count of Employees Working By Veteran Status in
-Sector 48</strong></p>
 <div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a>b<span class="ot">&lt;-</span>CS_48 <span class="sc">%&gt;%</span> </span>
 <span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>   <span class="fu">group_by</span>(SUBSECTOR,VET_GROUP) <span class="sc">%&gt;%</span> </span>
 <span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a>   <span class="fu">summarize</span>(<span class="at">nEmployees=</span><span class="fu">sum</span>(Employees)) <span class="sc">%&gt;%</span> </span>

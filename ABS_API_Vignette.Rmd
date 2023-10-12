@@ -450,7 +450,6 @@ ggplot(CS_SubSectors, aes(SUBSECTOR,TotFirms,fill=VET_GROUP))+
 Let's look at those summaries using crosstabs as an alternate way to view the data.   
 Since the ABS data is aggregated, I have used both dplyr functions and alternatively functions from pollster to help create cross-tab tables.  
 
-
 ```{r warning=FALSE, message=FALSE }
 #This section of code presents the graphical  information in tables
 
@@ -462,14 +461,12 @@ a<-CS_48 %>%
    
 ```
 
-__Crosstab Count of Firms by Veteran Status in Sector 48__
 ```{r}
 #Print the table
 knitr::kable(a,caption="Crosstab Count of Firms by Veteran Status in Sector 48")
 ```
 
 
-__Crosstab Count of Employees Working By Veteran Status in Sector 48__
 ```{r}
 
 b<-CS_48 %>% 
