@@ -125,7 +125,7 @@ labeled `industryCode=`. This value can take on any 2-4 digit
 representation of the NAICS table, using a “\*” as a wildcard.
 
 The NAICS 2017 table used is available here:
-<https://www.census.gov/naics/?48967>
+<https://www.census.gov/naics/?58967?yearbck=2017>
 
 **VETERAN STATUS-** A categorical variable that returns the status of
 the business owner as a veteran. The query parameter for this function
@@ -375,32 +375,52 @@ dataset, to get an overview of the the returned data.
 summary(CS_all)
 ```
 
-    ##    FIRMPDEMP            PAYANN               EMP            RCPPDEMP        
-    ##  Min.   :     0.0   Min.   :        0   Min.   :      0   Length:822        
-    ##  1st Qu.:     0.0   1st Qu.:        0   1st Qu.:      0   Class :character  
-    ##  Median :   102.5   Median :   101250   Median :   2100   Mode  :character  
-    ##  Mean   :  6627.0   Mean   :  3466582   Mean   :  75397                     
-    ##  3rd Qu.:  2281.5   3rd Qu.:  1654831   3rd Qu.:  35186                     
-    ##  Max.   :396226.0   Max.   :136308343   Max.   :8268436                     
-    ##                                                                             
-    ##      SECTOR      SUBSECTOR    NAICS2017         VET_GROUP      us           
-    ##  31     :253   311    : 27   Length:822         002:277   Length:822        
-    ##  44     : 79   332    : 27   Class :character   003:264   Class :character  
-    ##  48     : 77   423    : 27   Mode  :character   004:281   Mode  :character  
-    ##  42     : 57   424    : 27                                                  
-    ##  62     : 52   541    : 27                                                  
-    ##  56     : 33   561    : 24                                                  
-    ##  (Other):271   (Other):663                                                  
-    ##      Firms             Revenue     Payroll            Employees          Industry  
-    ##  Min.   :     0.0   Min.   :0   Min.   :        0   Min.   :      0   1131   :  3  
-    ##  1st Qu.:     0.0   1st Qu.:0   1st Qu.:        0   1st Qu.:      0   1132   :  3  
-    ##  Median :   102.5   Median :0   Median :   101250   Median :   2100   1133   :  3  
-    ##  Mean   :  6627.0   Mean   :0   Mean   :  3466582   Mean   :  75397   1142   :  3  
-    ##  3rd Qu.:  2281.5   3rd Qu.:0   3rd Qu.:  1654831   3rd Qu.:  35186   1151   :  3  
-    ##  Max.   :396226.0   Max.   :0   Max.   :136308343   Max.   :8268436   1152   :  3  
-    ##                                                                       (Other):804
+    ##    FIRMPDEMP            PAYANN               EMP         
+    ##  Min.   :     0.0   Min.   :        0   Min.   :      0  
+    ##  1st Qu.:     0.0   1st Qu.:        0   1st Qu.:      0  
+    ##  Median :   102.5   Median :   101250   Median :   2100  
+    ##  Mean   :  6627.0   Mean   :  3466582   Mean   :  75397  
+    ##  3rd Qu.:  2281.5   3rd Qu.:  1654831   3rd Qu.:  35186  
+    ##  Max.   :396226.0   Max.   :136308343   Max.   :8268436  
+    ##                                                          
+    ##    RCPPDEMP             SECTOR      SUBSECTOR  
+    ##  Length:822         31     :253   311    : 27  
+    ##  Class :character   44     : 79   332    : 27  
+    ##  Mode  :character   48     : 77   423    : 27  
+    ##                     42     : 57   424    : 27  
+    ##                     62     : 52   541    : 27  
+    ##                     56     : 33   561    : 24  
+    ##                     (Other):271   (Other):663  
+    ##   NAICS2017         VET_GROUP      us           
+    ##  Length:822         002:277   Length:822        
+    ##  Class :character   003:264   Class :character  
+    ##  Mode  :character   004:281   Mode  :character  
+    ##                                                 
+    ##                                                 
+    ##                                                 
+    ##                                                 
+    ##      Firms             Revenue     Payroll         
+    ##  Min.   :     0.0   Min.   :0   Min.   :        0  
+    ##  1st Qu.:     0.0   1st Qu.:0   1st Qu.:        0  
+    ##  Median :   102.5   Median :0   Median :   101250  
+    ##  Mean   :  6627.0   Mean   :0   Mean   :  3466582  
+    ##  3rd Qu.:  2281.5   3rd Qu.:0   3rd Qu.:  1654831  
+    ##  Max.   :396226.0   Max.   :0   Max.   :136308343  
+    ##                                                    
+    ##    Employees          Industry  
+    ##  Min.   :      0   1131   :  3  
+    ##  1st Qu.:      0   1132   :  3  
+    ##  Median :   2100   1133   :  3  
+    ##  Mean   :  75397   1142   :  3  
+    ##  3rd Qu.:  35186   1151   :  3  
+    ##  Max.   :8268436   1152   :  3  
+    ##                    (Other):804
 
-The chart below shows the firm distribution by 2 digit NAICS sector.
+The chart below shows the firm distribution by 2 digit NAICS sector. The
+chart below shows the number of firms operating by industry sector. Some
+of the largest sectors have the largest firm populations include sector
+54 (Professional Scientific and Techical Services, 23 - Construction,
+and 62 Healthcare for returned data.
 
 ``` r
 #Firm Population by Sector
@@ -420,7 +440,7 @@ ggplot(all_sector, aes(Firms, SECTOR)) +
 Let’s look at the the distribution of veteran owned firms. This
 represents one modification to the endpoint.
 
-### Resesarch Question 2 - Distribution of Veteran Owned Firms Across Sectors
+### RQ2 - Distribution of Veteran Owned Firms Across Sectors
 
 I have chosen to access the endpoint to review business ownership by
 veterans across all industry sectors.
@@ -502,8 +522,8 @@ CS_SubSectors<-CS_48 %>%
      summarize(TotFirms = sum(Firms))
 ```
 
-    ## `summarise()` has grouped output by 'SUBSECTOR'. You can override using the `.groups`
-    ## argument.
+    ## `summarise()` has grouped output by 'SUBSECTOR'. You can
+    ## override using the `.groups` argument.
 
 ``` r
 #Show the distribution of business owners by veteran status
@@ -513,8 +533,8 @@ CS_SubSectorEmps<-CS_48 %>%
      summarize(TotEmps = sum(Employees))
 ```
 
-    ## `summarise()` has grouped output by 'SUBSECTOR'. You can override using the `.groups`
-    ## argument.
+    ## `summarise()` has grouped output by 'SUBSECTOR'. You can
+    ## override using the `.groups` argument.
 
 ``` r
 #Plot Firms
@@ -542,7 +562,7 @@ ggplot(CS_SubSectors, aes(SUBSECTOR,TotFirms,fill=VET_GROUP))+
       theme_minimal()
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-6-2.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
 
 Let’s look at those summaries using crosstabs as an alternate way to
 view the data.  
@@ -559,8 +579,7 @@ a<-CS_48 %>%
    rename("Vets_Firms" ="VET_GROUP_002", "JointVetNonVet_Firms"= "VET_GROUP_003", "NonVets_Firms" = "VET_GROUP_004")
 ```
 
-    ## `summarise()` has grouped output by 'SUBSECTOR'. You can override using the `.groups`
-    ## argument.
+**Crosstab Count of Firms by Veteran Status in Sector 48**
 
 ``` r
 #Print the table
@@ -579,6 +598,8 @@ knitr::kable(a,caption="Crosstab Count of Firms by Veteran Status in Sector 48")
 
 Crosstab Count of Firms by Veteran Status in Sector 48
 
+**Crosstab Count of Employees Working By Veteran Status in Sector 48**
+
 ``` r
 b<-CS_48 %>% 
    group_by(SUBSECTOR,VET_GROUP) %>% 
@@ -587,8 +608,8 @@ b<-CS_48 %>%
     rename("Vets_Emps" ="VET_GROUP_002", "JointVet/NonVet_Emps"= "VET_GROUP_003", "NonVets_Emps" = "VET_GROUP_004")
 ```
 
-    ## `summarise()` has grouped output by 'SUBSECTOR'. You can override using the `.groups`
-    ## argument.
+    ## `summarise()` has grouped output by 'SUBSECTOR'. You can
+    ## override using the `.groups` argument.
 
 ``` r
 #Print the table
@@ -891,12 +912,14 @@ ggplot(sal_comp , aes( y=salary, fill=VET_GROUP)) +
   facet_wrap(~BUSCHAR)+
    labs(title= "Annual Pay By Business Owner Type in Sector 48",
           x= "Owner Sex",
-          y= "Sector") +
+          y= "Annual Pay/Employee") +
     theme_light()
 ```
 
-    ## Warning in geom_half_dotplot(side = "r"): Ignoring unknown parameters: `side`
+    ## Warning in geom_half_dotplot(side = "r"): Ignoring unknown
+    ## parameters: `side`
 
-    ## Bin width defaults to 1/30 of the range of the data. Pick better value with `binwidth`.
+    ## Bin width defaults to 1/30 of the range of the data. Pick better
+    ## value with `binwidth`.
 
-![](README_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->

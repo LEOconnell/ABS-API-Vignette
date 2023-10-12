@@ -80,7 +80,6 @@ options(scipen = 9999)
 Several functions are created to facilitate data retrieval. These functions allow query arguments to be passed in to select specific results.  Several helper functions are created to support the data wrangling and cleaning process. Wrapper functions are created to tidy data once received from the API call.  
 
 
-
 # Functions List 
 API Related Functions:  
 __CS Data__   
@@ -101,7 +100,7 @@ __ Helper Functions__
 
 __NAICS2017-__   The North American Industry Classification System (NAICS) industry code is the primary subsetting variable for both datasets. It is from the 2017 NAICS table. The argument for this query parameter is labeled `industryCode=`. This value can take on any 2-4 digit representation of the NAICS table, using a "*" as a wildcard.  
   
-The NAICS 2017 table used is available here: [https://www.census.gov/naics/?48967](https://www.census.gov/naics/?48967)  
+The NAICS 2017 table used is available here: [https://www.census.gov/naics/?58967?yearbck=2017](https://www.census.gov/naics/?58967?yearbck=2017)  
 
 __VETERAN STATUS-__ A categorical variable that returns the status of the business owner as a veteran.  The query parameter for this function argument is `vets=`, and cans take on the value, of vet, nonvet, both, all or a wildcard. 
 
@@ -339,7 +338,7 @@ Next, here is a look at the nature of the variables stored in the dataset, to ge
 ```{r }
 summary(CS_all)
 ```
-The chart below shows the firm distribution by 2 digit NAICS sector.  
+The chart below shows the firm distribution by 2 digit NAICS sector.  The chart below shows the number of firms operating by industry sector. Some of the largest sectors have the largest firm populations include sector 54 (Professional Scientific and Techical Services, 23 - Construction, and 62 Healthcare for returned data.  
 
 ```{r RQ1Summaries }
 
@@ -358,7 +357,7 @@ ggplot(all_sector, aes(Firms, SECTOR)) +
 
 Let's look at the the distribution of veteran owned firms.  This represents one modification to the endpoint.
 
-### Resesarch Question 2 - Distribution of Veteran Owned Firms Across Sectors  
+### RQ2 - Distribution of Veteran Owned Firms Across Sectors  
 
 I have chosen to access the endpoint to review business ownership by veterans across all industry sectors.   
 ```{r }
@@ -391,7 +390,6 @@ ggplot(vet_by_sector,aes(total_firms, x=SECTOR)) +
 The distribution of veteran owned firms for the most part mimics the wider distribution of firms shown in the previous plot, however some sectors, 53 and 72 may have a different levels of ownership for vets compared to the general population of firms. This could be further investigated.
 
 There are large concentrations of veterans in sector 23(Construction), 54(Scientific & Technincal Services), and 62 (Healthcare). Of course this is consistent with the overall size of the these sectors.   
-
 
 ### RQ3: An Exloration of Veteran Owned Businesses in  Transporation Industry - NAICS Sector 48  
 
@@ -433,6 +431,11 @@ ggplot(CS_SubSectors, aes(SUBSECTOR,TotFirms,fill=VET_GROUP))+
            labels=c("Veterans", "Vet/NonVet Partners", "NonVeterans"))+
      theme_minimal()
   
+
+```
+
+
+```{r}
 #Plot Employees
   ggplot(CS_SubSectorEmps, aes(SUBSECTOR,TotEmps,fill=VET_GROUP))+
   geom_col()+
@@ -442,14 +445,13 @@ ggplot(CS_SubSectors, aes(SUBSECTOR,TotFirms,fill=VET_GROUP))+
      scale_fill_discrete(name="Veteran Status",
                    labels=c("Veterans", "Vet/NonVet Partners", "NonVeterans"))+
       theme_minimal()
-
 ```
 
 Let's look at those summaries using crosstabs as an alternate way to view the data.   
 Since the ABS data is aggregated, I have used both dplyr functions and alternatively functions from pollster to help create cross-tab tables.  
 
 
-```{r }
+```{r warning=FALSE, message=FALSE }
 #This section of code presents the graphical  information in tables
 
 a<-CS_48 %>% 
@@ -458,19 +460,26 @@ a<-CS_48 %>%
    spread(VET_GROUP,nFirms,sep="_") %>% 
    rename("Vets_Firms" ="VET_GROUP_002", "JointVetNonVet_Firms"= "VET_GROUP_003", "NonVets_Firms" = "VET_GROUP_004")
    
+```
 
+__Crosstab Count of Firms by Veteran Status in Sector 48__
+```{r}
 #Print the table
 knitr::kable(a,caption="Crosstab Count of Firms by Veteran Status in Sector 48")
+```
+
+
+__Crosstab Count of Employees Working By Veteran Status in Sector 48__
+```{r}
 
 b<-CS_48 %>% 
    group_by(SUBSECTOR,VET_GROUP) %>% 
    summarize(nEmployees=sum(Employees)) %>% 
    spread(VET_GROUP,nEmployees,sep="_") %>% 
     rename("Vets_Emps" ="VET_GROUP_002", "JointVet/NonVet_Emps"= "VET_GROUP_003", "NonVets_Emps" = "VET_GROUP_004")
- 
+
 #Print the table
 knitr::kable(b,caption="Crosstab Count of Employees Working By Veteran Status in Sector 48")
-
 ```
 
 ## RQ4: Payroll/Employee Differences By Veteran Status In Transporation Industry  
@@ -630,7 +639,7 @@ ggplot(sal_comp , aes( y=salary, fill=VET_GROUP)) +
   facet_wrap(~BUSCHAR)+
    labs(title= "Annual Pay By Business Owner Type in Sector 48",
           x= "Owner Sex",
-          y= "Sector") +
+          y= "Annual Pay/Employee") +
     theme_light()
 
 ```
