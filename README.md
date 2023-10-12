@@ -3,10 +3,6 @@ Census Bureau ABS API Vignette
 Lisa O’Connell
 2023-10-11
 
-``` r
-knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
-```
-
 ## Introduction
 
 Data from the American Business Survey (ABS) conducted by the US Census
@@ -379,30 +375,30 @@ dataset, to get an overview of the the returned data.
 summary(CS_all)
 ```
 
-    ##    FIRMPDEMP            PAYANN               EMP            RCPPDEMP             SECTOR   
-    ##  Min.   :     0.0   Min.   :        0   Min.   :      0   Length:822         31     :253  
-    ##  1st Qu.:     0.0   1st Qu.:        0   1st Qu.:      0   Class :character   44     : 79  
-    ##  Median :   102.5   Median :   101250   Median :   2100   Mode  :character   48     : 77  
-    ##  Mean   :  6627.0   Mean   :  3466582   Mean   :  75397                      42     : 57  
-    ##  3rd Qu.:  2281.5   3rd Qu.:  1654831   3rd Qu.:  35186                      62     : 52  
-    ##  Max.   :396226.0   Max.   :136308343   Max.   :8268436                      56     : 33  
-    ##                                                                              (Other):271  
-    ##    SUBSECTOR    NAICS2017         VET_GROUP      us                Firms             Revenue 
-    ##  311    : 27   Length:822         002:277   Length:822         Min.   :     0.0   Min.   :0  
-    ##  332    : 27   Class :character   003:264   Class :character   1st Qu.:     0.0   1st Qu.:0  
-    ##  423    : 27   Mode  :character   004:281   Mode  :character   Median :   102.5   Median :0  
-    ##  424    : 27                                                   Mean   :  6627.0   Mean   :0  
-    ##  541    : 27                                                   3rd Qu.:  2281.5   3rd Qu.:0  
-    ##  561    : 24                                                   Max.   :396226.0   Max.   :0  
-    ##  (Other):663                                                                                 
-    ##     Payroll            Employees          Industry  
-    ##  Min.   :        0   Min.   :      0   1131   :  3  
-    ##  1st Qu.:        0   1st Qu.:      0   1132   :  3  
-    ##  Median :   101250   Median :   2100   1133   :  3  
-    ##  Mean   :  3466582   Mean   :  75397   1142   :  3  
-    ##  3rd Qu.:  1654831   3rd Qu.:  35186   1151   :  3  
-    ##  Max.   :136308343   Max.   :8268436   1152   :  3  
-    ##                                        (Other):804
+    ##    FIRMPDEMP            PAYANN               EMP            RCPPDEMP        
+    ##  Min.   :     0.0   Min.   :        0   Min.   :      0   Length:822        
+    ##  1st Qu.:     0.0   1st Qu.:        0   1st Qu.:      0   Class :character  
+    ##  Median :   102.5   Median :   101250   Median :   2100   Mode  :character  
+    ##  Mean   :  6627.0   Mean   :  3466582   Mean   :  75397                     
+    ##  3rd Qu.:  2281.5   3rd Qu.:  1654831   3rd Qu.:  35186                     
+    ##  Max.   :396226.0   Max.   :136308343   Max.   :8268436                     
+    ##                                                                             
+    ##      SECTOR      SUBSECTOR    NAICS2017         VET_GROUP      us           
+    ##  31     :253   311    : 27   Length:822         002:277   Length:822        
+    ##  44     : 79   332    : 27   Class :character   003:264   Class :character  
+    ##  48     : 77   423    : 27   Mode  :character   004:281   Mode  :character  
+    ##  42     : 57   424    : 27                                                  
+    ##  62     : 52   541    : 27                                                  
+    ##  56     : 33   561    : 24                                                  
+    ##  (Other):271   (Other):663                                                  
+    ##      Firms             Revenue     Payroll            Employees          Industry  
+    ##  Min.   :     0.0   Min.   :0   Min.   :        0   Min.   :      0   1131   :  3  
+    ##  1st Qu.:     0.0   1st Qu.:0   1st Qu.:        0   1st Qu.:      0   1132   :  3  
+    ##  Median :   102.5   Median :0   Median :   101250   Median :   2100   1133   :  3  
+    ##  Mean   :  6627.0   Mean   :0   Mean   :  3466582   Mean   :  75397   1142   :  3  
+    ##  3rd Qu.:  2281.5   3rd Qu.:0   3rd Qu.:  1654831   3rd Qu.:  35186   1151   :  3  
+    ##  Max.   :396226.0   Max.   :0   Max.   :136308343   Max.   :8268436   1152   :  3  
+    ##                                                                       (Other):804
 
 The chart below shows the firm distribution by 2 digit NAICS sector.
 
@@ -504,13 +500,23 @@ Transportation.
 CS_SubSectors<-CS_48 %>%      
     group_by(SUBSECTOR,VET_GROUP) %>% 
      summarize(TotFirms = sum(Firms))
+```
 
+    ## `summarise()` has grouped output by 'SUBSECTOR'. You can override using the `.groups`
+    ## argument.
+
+``` r
 #Show the distribution of business owners by veteran status
 
 CS_SubSectorEmps<-CS_48 %>%      
     group_by(SUBSECTOR,VET_GROUP) %>% 
      summarize(TotEmps = sum(Employees))
+```
 
+    ## `summarise()` has grouped output by 'SUBSECTOR'. You can override using the `.groups`
+    ## argument.
+
+``` r
 #Plot Firms
 ggplot(CS_SubSectors, aes(SUBSECTOR,TotFirms,fill=VET_GROUP))+
   geom_col()+
@@ -551,8 +557,12 @@ a<-CS_48 %>%
    summarize(nFirms=sum(Firms)) %>% 
    spread(VET_GROUP,nFirms,sep="_") %>% 
    rename("Vets_Firms" ="VET_GROUP_002", "JointVetNonVet_Firms"= "VET_GROUP_003", "NonVets_Firms" = "VET_GROUP_004")
-   
+```
 
+    ## `summarise()` has grouped output by 'SUBSECTOR'. You can override using the `.groups`
+    ## argument.
+
+``` r
 #Print the table
 knitr::kable(a,caption="Crosstab Count of Firms by Veteran Status in Sector 48")
 ```
@@ -575,7 +585,12 @@ b<-CS_48 %>%
    summarize(nEmployees=sum(Employees)) %>% 
    spread(VET_GROUP,nEmployees,sep="_") %>% 
     rename("Vets_Emps" ="VET_GROUP_002", "JointVet/NonVet_Emps"= "VET_GROUP_003", "NonVets_Emps" = "VET_GROUP_004")
- 
+```
+
+    ## `summarise()` has grouped output by 'SUBSECTOR'. You can override using the `.groups`
+    ## argument.
+
+``` r
 #Print the table
 knitr::kable(b,caption="Crosstab Count of Employees Working By Veteran Status in Sector 48")
 ```
@@ -879,5 +894,9 @@ ggplot(sal_comp , aes( y=salary, fill=VET_GROUP)) +
           y= "Sector") +
     theme_light()
 ```
+
+    ## Warning in geom_half_dotplot(side = "r"): Ignoring unknown parameters: `side`
+
+    ## Bin width defaults to 1/30 of the range of the data. Pick better value with `binwidth`.
 
 ![](README_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->

@@ -3,11 +3,12 @@ title: "Census Bureau ABS API Vignette"
 author: "Lisa O'Connell"
 date: "`r Sys.Date()`"
 output: github_document
-
+editor_options: 
+  chunk_output_type: console
 ---
 
-```{r setup, message=FALSE, warning=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```{r setup, message=FALSE, warning=FALSE,  include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Introduction  
